@@ -137,6 +137,14 @@
     <div class="field"><label>ID number <span class="req">*</span></label>
       <input id="idNo" autocomplete="off" autocapitalize="characters" spellcheck="false"
              placeholder="As shown on your ID" maxlength="40"></div>
+    <div class="field"><label>Company / organisation</label>
+      <input id="company" placeholder="Optional" autocapitalize="characters" maxlength="80"></div>
+    <div class="field"><label>Contact number <span class="req">*</span></label>
+      <input id="contactNo" type="tel" inputmode="tel" autocomplete="tel"
+             placeholder="e.g. 0917 123 4567" maxlength="20"></div>
+    <div class="field"><label>Address <span class="req">*</span></label>
+      <input id="address" autocomplete="street-address" autocapitalize="words"
+             placeholder="House no., street, barangay, city" maxlength="160"></div>
     <div class="field"><label>Department visiting <span class="req">*</span></label>
       <input id="dept" placeholder="e.g. HR" autocapitalize="characters" maxlength="60"></div>
     <div class="field"><label>Contact person <span class="req">*</span></label>
@@ -314,7 +322,7 @@ function say(box,text,kind){
 }
 function reset(){
   currentBadge=''; $('badgeInput').value='';
-  ['lastName','firstName','mi','idNo','dept','contact','remarks','purposeOther']
+  ['lastName','firstName','mi','idNo','company','contactNo','address','dept','contact','remarks','purposeOther']
     .forEach(function(f){$(f).value=''});
   $('idPresented').value=''; $('purpose').value='';
   $('purposeOtherField').classList.add('hide');
@@ -370,6 +378,7 @@ function doRegister(){
     action:'register',
     lastName:$('lastName').value, firstName:$('firstName').value, mi:$('mi').value,
     idPresented:$('idPresented').value, idNo:$('idNo').value,
+    company:$('company').value, contactNo:$('contactNo').value, address:$('address').value,
     dept:$('dept').value, contact:$('contact').value,
     purpose:$('purpose').value, purposeOther:$('purposeOther').value,
     remarks:$('remarks').value, signature:pads.sigIn.data()
