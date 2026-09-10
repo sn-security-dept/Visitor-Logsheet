@@ -9,7 +9,7 @@
   :root{
     --brand:#DF6A2E; --brand-dk:#B94F1A; --brand-tint:#FDF0E7;
     --ink:#1A1512; --paper:#FCFAF8; --line:#E2D9D1; --muted:#726860;
-    --ok:#1F6B45; --warn:#8A5A00;
+    --ok:#1F6B45; --warn:#8A5A00; --bad:#8C1220;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--paper);color:var(--ink);
@@ -26,10 +26,12 @@
 
   label{display:block;font-size:14.5px;font-weight:600;margin:0 0 6px}
   .req{color:var(--brand-dk);font-weight:400}
+  .opt{color:var(--muted);font-weight:400;font-size:13px}
   input,select{width:100%;padding:13px 14px;font-size:17px;font-family:inherit;
     border:1.5px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
   input:focus,select:focus{outline:none;border-color:var(--brand);
     box-shadow:0 0 0 3px rgba(223,106,46,.18)}
+  input[aria-invalid="true"],select[aria-invalid="true"]{border-color:#C9414F;background:#FFF7F8}
   .field{margin-bottom:17px}
   .row{display:flex;gap:11px}
   .row .field{flex:1}
@@ -52,6 +54,34 @@
   .choice button.alt small{color:var(--muted)}
   .choice button.alt:active{background:var(--brand-tint)}
 
+  /* Wizard progress */
+  .prog{display:flex;gap:6px;margin:0 0 22px;padding:0;list-style:none}
+  .prog li{flex:1;text-align:center;font-size:12px;color:var(--muted);position:relative;padding-top:12px}
+  .prog li::before{content:"";display:block;height:5px;border-radius:3px;background:var(--line);
+    position:absolute;top:0;left:0;right:0}
+  .prog li.done::before{background:var(--ok)}
+  .prog li.now::before{background:var(--brand)}
+  .prog li.now{color:var(--brand-dk);font-weight:600}
+  .stepnum{font-size:12.5px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin:0 0 4px}
+  .panel{display:none}
+  .panel.on{display:block}
+  .nav{display:flex;gap:10px;margin-top:22px}
+  .nav button{margin-top:0}
+  .nav .ghost{flex:0 0 32%}
+
+  /* Review */
+  .rev{background:#fff;border:1.5px solid var(--line);border-radius:8px;margin-bottom:16px;overflow:hidden}
+  .rev .rh{display:flex;justify-content:space-between;align-items:center;
+    background:var(--brand-tint);padding:10px 14px;font-weight:600;font-size:15px}
+  .rev .rh button{width:auto;padding:5px 12px;font-size:13.5px;background:#fff;
+    color:var(--brand-dk);border:1.5px solid var(--line)}
+  .rev dl{margin:0;padding:6px 14px 10px}
+  .rev div.kv{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--line);font-size:15px}
+  .rev div.kv:last-child{border-bottom:none}
+  .rev dt{flex:0 0 38%;color:var(--muted);margin:0}
+  .rev dd{flex:1;margin:0;word-break:break-word}
+  .rev dd.empty{color:var(--muted)}
+
   .sigbox{border:1.5px solid var(--line);border-radius:7px;background:#fff;overflow:hidden}
   canvas{display:block;width:100%;height:170px;touch-action:none}
   .sigfoot{display:flex;justify-content:space-between;align-items:center;
@@ -66,7 +96,7 @@
   .card .tin b{font-variant-numeric:tabular-nums}
 
   .msg{padding:13px 15px;border-radius:7px;font-size:15px;margin-bottom:20px;display:none}
-  .msg.err{background:#FBEAEC;border:1px solid #E4B4BB;color:#8C1220;display:block}
+  .msg.err{background:#FBEAEC;border:1px solid #E4B4BB;color:var(--bad);display:block}
   .msg.warn{background:#FDF4E3;border:1px solid #E3CFA0;color:var(--warn);display:block}
 
   .done{text-align:center;padding:36px 10px}
@@ -79,7 +109,6 @@
   .done .nm{font-size:17px;font-weight:600}
   .done .hint{color:var(--muted);font-size:14.5px;margin-top:22px}
 
-  /* Reference code — the dominant element on the pending screen */
   .refcode{display:inline-block;margin:18px auto 10px;padding:18px 30px;
     background:#fff;border:2px solid var(--brand);border-radius:12px;
     font-size:58px;font-weight:700;letter-spacing:.22em;color:var(--brand-dk);
@@ -106,77 +135,130 @@
 
 <div class="wrap">
 
-  <!-- Landing: choose Register or Sign out. No badge field here. -->
+  <!-- Landing -->
   <div id="step-home">
     <h2>Welcome</h2>
     <p class="lede">What would you like to do?</p>
     <div id="msg0" class="msg"></div>
     <div class="choice">
       <button id="btnGoRegister">Register
-        <small>Arriving. Fill in your details for the guard.</small></button>
+        <small>Arriving. Fill in your details for security personnel.</small></button>
       <button id="btnGoSignout" class="alt">Sign out
         <small>Leaving. Enter your Solaire badge number.</small></button>
     </div>
   </div>
 
-  <!-- Register -->
+  <!-- Register wizard -->
   <div id="step-in" class="hide">
-    <h2>Register</h2>
-    <p class="lede">Fill in your details. The guard will review them before issuing a badge.</p>
-    <div id="msg2" class="msg"></div>
+    <ol class="prog" id="prog" aria-label="Registration progress">
+      <li data-p="1">Personal</li>
+      <li data-p="2">Identification</li>
+      <li data-p="3">Visit</li>
+      <li data-p="4">Review</li>
+    </ol>
+    <div id="msg2" class="msg" role="alert"></div>
 
-    <div class="field"><label>Last name <span class="req">*</span></label>
-      <input id="lastName" autocomplete="family-name" autocapitalize="words" maxlength="60"></div>
-    <div class="row">
-      <div class="field"><label>First name <span class="req">*</span></label>
-        <input id="firstName" autocomplete="given-name" autocapitalize="words" maxlength="60"></div>
-      <div class="field mi"><label>M.I.</label><input id="mi" maxlength="2"></div>
-    </div>
-    <div class="field"><label>ID presented <span class="req">*</span></label>
-      <select id="idPresented"><option value="">Select ID</option></select></div>
-    <div class="field"><label>ID number <span class="req">*</span></label>
-      <input id="idNo" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             placeholder="As shown on your ID" maxlength="40"></div>
-    <div class="field"><label>Company / organisation</label>
-      <input id="company" placeholder="Optional" autocapitalize="characters" maxlength="80"></div>
-    <div class="field"><label>Contact number <span class="req">*</span></label>
-      <input id="contactNo" type="tel" inputmode="tel" autocomplete="tel"
-             placeholder="e.g. 0917 123 4567" maxlength="20"></div>
-    <div class="field"><label>Address <span class="req">*</span></label>
-      <input id="address" autocomplete="street-address" autocapitalize="words"
-             placeholder="House no., street, barangay, city" maxlength="160"></div>
-    <div class="field"><label>Department visiting <span class="req">*</span></label>
-      <input id="dept" placeholder="e.g. HR" autocapitalize="characters" maxlength="60"></div>
-    <div class="field"><label>Contact person <span class="req">*</span></label>
-      <input id="contact" placeholder="e.g. Ms. Sophia Mabaet" autocapitalize="words" maxlength="80"></div>
+    <!-- 1: Personal information -->
+    <section class="panel" data-panel="1">
+      <p class="stepnum">Step 1 of 4</p>
+      <h2>Personal information</h2>
+      <p class="lede">Tell us who you are.</p>
 
-    <div class="field"><label>Purpose of visit <span class="req">*</span></label>
-      <select id="purpose"><option value="">Select purpose</option></select></div>
-    <div class="field hide" id="purposeOtherField">
-      <label>Please describe <span class="req">*</span></label>
-      <input id="purposeOther" placeholder="Briefly, what brings you here" maxlength="120"></div>
-
-    <div class="field"><label>Remarks</label><input id="remarks" placeholder="Optional" maxlength="200"></div>
-
-    <div class="field">
-      <label>Signature <span class="req">*</span></label>
-      <div class="sigbox">
-        <canvas id="sigIn"></canvas>
-        <div class="sigfoot"><span>Sign with your finger</span>
-          <button type="button" data-clear="sigIn">Clear</button></div>
+      <div class="field"><label for="lastName">Last name <span class="req">*</span></label>
+        <input id="lastName" autocomplete="family-name" autocapitalize="words" maxlength="60"></div>
+      <div class="row">
+        <div class="field"><label for="firstName">First name <span class="req">*</span></label>
+          <input id="firstName" autocomplete="given-name" autocapitalize="words" maxlength="60"></div>
+        <div class="field mi"><label for="mi">M.I.</label><input id="mi" maxlength="2"></div>
       </div>
+      <div class="field"><label for="visitorType">Visitor type <span class="req">*</span></label>
+        <select id="visitorType"><option value="">Select type</option></select></div>
+      <div class="field hide" id="visitorTypeOtherField">
+        <label for="visitorTypeOther">Please specify <span class="req">*</span></label>
+        <input id="visitorTypeOther" placeholder="e.g. Applicant, Auditor" maxlength="60"></div>
+      <div class="field"><label for="company">Company / organisation <span class="opt">(optional)</span></label>
+        <input id="company" autocapitalize="characters" maxlength="80"></div>
+      <div class="field"><label for="contactNo">Contact number <span class="req">*</span></label>
+        <input id="contactNo" type="tel" inputmode="tel" autocomplete="tel"
+               placeholder="e.g. 0917 123 4567" maxlength="20"></div>
+      <div class="field"><label for="address">Address <span class="req">*</span></label>
+        <input id="address" autocomplete="street-address" autocapitalize="words"
+               placeholder="House no., street, barangay, city" maxlength="160"></div>
+    </section>
+
+    <!-- 2: Identification -->
+    <section class="panel" data-panel="2">
+      <p class="stepnum">Step 2 of 4</p>
+      <h2>Identification</h2>
+      <p class="lede">The ID you are presenting to security personnel.</p>
+
+      <div class="field"><label for="idPresented">ID presented <span class="req">*</span></label>
+        <select id="idPresented"><option value="">Select ID</option></select></div>
+      <div class="field"><label for="idNo">ID number <span class="req">*</span></label>
+        <input id="idNo" autocomplete="off" autocapitalize="characters" spellcheck="false"
+               placeholder="As shown on your ID" maxlength="40"></div>
+    </section>
+
+    <!-- 3: Visit details -->
+    <section class="panel" data-panel="3">
+      <p class="stepnum">Step 3 of 4</p>
+      <h2>Visit details</h2>
+      <p class="lede">Who you are here to see and why.</p>
+
+      <div class="field"><label for="dept">Department visiting <span class="req">*</span></label>
+        <input id="dept" placeholder="e.g. HR" autocapitalize="characters" maxlength="60"></div>
+      <div class="field"><label for="contact">Contact person <span class="req">*</span></label>
+        <input id="contact" placeholder="e.g. Ms. Sophia Mabaet" autocapitalize="words" maxlength="80"></div>
+      <div class="field"><label for="purpose">Purpose of visit <span class="req">*</span></label>
+        <select id="purpose"><option value="">Select purpose</option></select></div>
+      <div class="field hide" id="purposeOtherField">
+        <label for="purposeOther">Please describe <span class="req">*</span></label>
+        <input id="purposeOther" placeholder="Briefly, what brings you here" maxlength="120"></div>
+      <div class="field"><label for="remarks">Remarks <span class="opt">(optional)</span></label>
+        <input id="remarks" maxlength="200"></div>
+    </section>
+
+    <!-- 4: Review and sign -->
+    <section class="panel" data-panel="4">
+      <p class="stepnum">Step 4 of 4</p>
+      <h2>Review and sign</h2>
+      <p class="lede">Check everything, then sign to submit.</p>
+
+      <div class="rev">
+        <div class="rh">Personal information <button type="button" data-edit="1">Edit</button></div>
+        <dl id="rev1"></dl>
+      </div>
+      <div class="rev">
+        <div class="rh">Identification <button type="button" data-edit="2">Edit</button></div>
+        <dl id="rev2"></dl>
+      </div>
+      <div class="rev">
+        <div class="rh">Visit details <button type="button" data-edit="3">Edit</button></div>
+        <dl id="rev3"></dl>
+      </div>
+
+      <div class="field">
+        <label>Signature <span class="req">*</span></label>
+        <div class="sigbox">
+          <canvas id="sigIn"></canvas>
+          <div class="sigfoot"><span>Sign with your finger</span>
+            <button type="button" data-clear="sigIn">Clear</button></div>
+        </div>
+      </div>
+
+      <p class="consent">By signing, you authorise the Company to obtain, collect, use, process,
+        share and retain your personal information for security and identification purposes as
+        indicated in the Privacy Policy, and to retain adequate documentation of said information
+        for five (5) years from the date of processing.</p>
+    </section>
+
+    <div class="nav">
+      <button class="ghost" id="btnPrev" type="button">Back</button>
+      <button id="btnNext" type="button">Next</button>
     </div>
-
-    <p class="consent">By signing, you authorise the Company to obtain, collect, use, process,
-      share and retain your personal information for security and identification purposes as
-      indicated in the Privacy Policy, and to retain adequate documentation of said information
-      for five (5) years from the date of processing.</p>
-
-    <button id="btnRegister" style="margin-top:18px">Submit registration</button>
-    <button class="ghost" data-back>Back</button>
   </div>
 
-  <!-- Registration submitted: ref code first, then name, then instructions -->
+  <!-- Registration submitted -->
   <div id="step-pending" class="hide">
     <div class="done">
       <div class="tick wait">&#8987;</div>
@@ -186,9 +268,9 @@
       <div class="nm" id="pendName"></div>
       <div class="wait-steps">
         <ol>
-          <li>Please wait for the guard.</li>
+          <li>Please wait for security personnel.</li>
           <li>Show them this screen.</li>
-          <li>If approved, the guard will hand you a Solaire badge.</li>
+          <li>If approved, security personnel will hand you a Solaire badge.</li>
         </ol>
       </div>
       <p class="hint">Keep the badge with you. You will need its number to sign out when you leave.</p>
@@ -196,11 +278,11 @@
     </div>
   </div>
 
-  <!-- Sign out step 1: badge number -->
+  <!-- Sign out step 1 -->
   <div id="step-badge" class="hide">
     <h2>Sign out</h2>
-    <p class="lede">Enter the number on the Solaire badge the guard gave you.</p>
-    <div id="msg1" class="msg"></div>
+    <p class="lede">Enter the number on the Solaire badge security personnel gave you.</p>
+    <div id="msg1" class="msg" role="alert"></div>
     <div class="field">
       <input id="badgeInput" type="text" inputmode="numeric" autocomplete="off"
              placeholder="0000" maxlength="6" aria-label="Solaire badge number">
@@ -209,11 +291,11 @@
     <button class="ghost" data-back>Back</button>
   </div>
 
-  <!-- Sign out step 2: confirm and sign -->
+  <!-- Sign out step 2 -->
   <div id="step-out" class="hide">
     <h2>Sign out</h2>
     <p class="lede">Check your details, then sign.</p>
-    <div id="msg3" class="msg"></div>
+    <div id="msg3" class="msg" role="alert"></div>
     <div class="card">
       <p class="nm" id="outName"></p>
       <p class="meta" id="outMeta"></p>
@@ -269,11 +351,17 @@ function normBadge(v){
   while(d.length < BADGE_LENGTH) d = '0' + d;
   return d;
 }
+/** Same rule as the server: optional leading +, 7 to 15 digits. */
+function phoneOk(v){
+  var d = String(v||'').replace(/\D/g,'');
+  return d.length >= 7 && d.length <= 15;
+}
 
 function Pad(canvas){
   var ctx=canvas.getContext('2d'), drawing=false, dirty=false, last=null;
   function size(){
     var r=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    if(!r.width) return;                       // hidden: nothing to size yet
     var prev = dirty ? canvas.toDataURL() : null;
     canvas.width=r.width*dpr; canvas.height=r.height*dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -298,16 +386,18 @@ function Pad(canvas){
 }
 
 var STEPS=['step-home','step-in','step-pending','step-badge','step-out','step-done'];
+var FIELDS=['lastName','firstName','mi','visitorType','visitorTypeOther','company','contactNo','address',
+            'idPresented','idNo','dept','contact','purpose','purposeOther','remarks'];
 var pads={}, currentBadge='';
+var wiz={ step:1, last:4, toReview:false };
 var $=function(id){return document.getElementById(id)};
+var val=function(id){return String($(id).value||'').trim()};
 
 function show(id){
   STEPS.forEach(function(s){ $(s).classList.toggle('hide', s!==id); });
   $('spin').classList.add('hide');
   window.scrollTo(0,0);
-  if(id==='step-in') pads.sigIn.resize();
   if(id==='step-out') pads.sigOut.resize();
-  if(id==='step-badge') setTimeout(function(){ $('badgeInput').focus(); }, 50);
 }
 function busy(on){
   $('spin').classList.toggle('hide',!on);
@@ -322,12 +412,12 @@ function say(box,text,kind){
 }
 function reset(){
   currentBadge=''; $('badgeInput').value='';
-  ['lastName','firstName','mi','idNo','company','contactNo','address','dept','contact','remarks','purposeOther']
-    .forEach(function(f){$(f).value=''});
-  $('idPresented').value=''; $('purpose').value='';
+  FIELDS.forEach(function(f){ $(f).value=''; $(f).removeAttribute('aria-invalid'); });
+  $('visitorTypeOtherField').classList.add('hide');
   $('purposeOtherField').classList.add('hide');
   pads.sigIn.clear(); pads.sigOut.clear();
   ['msg0','msg1','msg2','msg3'].forEach(function(m){ say(m,''); });
+  wiz.step=1; wiz.toReview=false;
   show('step-home');
 }
 
@@ -341,25 +431,44 @@ window.addEventListener('load',function(){
   document.querySelectorAll('[data-back]').forEach(function(b){
     b.addEventListener('click',reset);
   });
+  document.querySelectorAll('[data-edit]').forEach(function(b){
+    b.addEventListener('click',function(){ wiz.toReview=true; goStep(Number(b.dataset.edit)); });
+  });
 
   api({action:'config'}).then(function(res){
     if(!res.ok) return;
     BADGE_LENGTH = res.badgeLength || 4;
     fill($('idPresented'), res.idTypes);
     fill($('purpose'), res.purposes);
+    fill($('visitorType'), res.visitorTypes);
   }).catch(function(){
     say('msg0','Cannot reach the server. Check your connection.');
   });
 
+  $('visitorType').addEventListener('change',function(){
+    $('visitorTypeOtherField').classList.toggle('hide', this.value !== 'Other');
+    if(this.value==='Other') $('visitorTypeOther').focus();
+  });
   $('purpose').addEventListener('change',function(){
     $('purposeOtherField').classList.toggle('hide', this.value !== 'Other');
+    if(this.value==='Other') $('purposeOther').focus();
   });
 
-  $('btnGoRegister').addEventListener('click',function(){ say('msg2',''); show('step-in'); });
-  $('btnGoSignout').addEventListener('click',function(){ say('msg1',''); show('step-badge'); });
+  // Clear the red state as soon as the visitor edits a flagged field.
+  FIELDS.forEach(function(f){
+    $(f).addEventListener('input',function(){ this.removeAttribute('aria-invalid'); });
+  });
+  // Enter in a wizard text field advances, like a native form.
+  $('step-in').addEventListener('keydown',function(e){
+    if(e.key==='Enter' && e.target.tagName==='INPUT'){ e.preventDefault(); next(); }
+  });
+
+  $('btnGoRegister').addEventListener('click',function(){ say('msg2',''); wiz.toReview=false; goStep(1); show('step-in'); });
+  $('btnGoSignout').addEventListener('click',function(){ say('msg1',''); show('step-badge'); setTimeout(function(){$('badgeInput').focus()},50); });
+  $('btnPrev').addEventListener('click',prev);
+  $('btnNext').addEventListener('click',next);
   $('badgeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLookup(); });
   $('btnLookup').addEventListener('click',doLookup);
-  $('btnRegister').addEventListener('click',doRegister);
   $('btnCheckOut').addEventListener('click',doCheckOut);
 });
 
@@ -369,27 +478,134 @@ function fill(sel, items){
   });
 }
 
+// ── Wizard ──────────────────────────────────────────────────────────────────
+function goStep(n){
+  wiz.step=n;
+  say('msg2','');
+  document.querySelectorAll('.panel').forEach(function(p){
+    p.classList.toggle('on', Number(p.dataset.panel)===n);
+  });
+  document.querySelectorAll('#prog li').forEach(function(li){
+    var p=Number(li.dataset.p);
+    li.className = p<n ? 'done' : (p===n ? 'now' : '');
+    li.setAttribute('aria-current', p===n ? 'step' : 'false');
+  });
+  $('btnPrev').textContent = n===1 ? 'Cancel' : 'Back';
+  $('btnNext').textContent = n===wiz.last ? 'Submit registration' : (wiz.toReview ? 'Save and review' : 'Next');
+  window.scrollTo(0,0);
+  if(n===wiz.last){ buildReview(); setTimeout(pads.sigIn.resize,0); }
+  else {
+    var first=document.querySelector('.panel.on input, .panel.on select');
+    if(first) setTimeout(function(){ first.focus(); },50);
+  }
+}
+function prev(){
+  if(wiz.step===1){ reset(); return; }
+  if(wiz.toReview){ wiz.toReview=false; goStep(wiz.last); return; }
+  goStep(wiz.step-1);
+}
+function next(){
+  if(wiz.step===wiz.last){ doRegister(); return; }
+  var err=validateStep(wiz.step);
+  if(err){ say('msg2',err.message); flag(err.field); return; }
+  if(wiz.toReview){ wiz.toReview=false; goStep(wiz.last); return; }
+  goStep(wiz.step+1);
+}
+function flag(id){
+  if(!id) return;
+  var el=$(id); el.setAttribute('aria-invalid','true');
+  el.focus(); el.scrollIntoView({block:'center',behavior:'smooth'});
+}
+
+/** Mirrors the server rules so the visitor is stopped early; the server is still the authority. */
+function validateStep(n){
+  if(n===1){
+    if(!val('lastName'))  return {field:'lastName',  message:'Last name is required.'};
+    if(!val('firstName')) return {field:'firstName', message:'First name is required.'};
+    if(!val('visitorType')) return {field:'visitorType', message:'Select the visitor type.'};
+    if(val('visitorType')==='Other' && !val('visitorTypeOther'))
+      return {field:'visitorTypeOther', message:'Please specify the visitor type.'};
+    if(!val('contactNo')) return {field:'contactNo', message:'Contact number is required.'};
+    if(!phoneOk(val('contactNo'))) return {field:'contactNo', message:'Enter a valid contact number (7 to 15 digits).'};
+    if(!val('address'))   return {field:'address',   message:'Address is required.'};
+  }
+  if(n===2){
+    if(!val('idPresented')) return {field:'idPresented', message:'Select the ID you presented.'};
+    if(!val('idNo'))        return {field:'idNo',        message:'Enter your ID number.'};
+  }
+  if(n===3){
+    if(!val('dept'))    return {field:'dept',    message:'Department is required.'};
+    if(!val('contact')) return {field:'contact', message:'Contact person is required.'};
+    if(!val('purpose')) return {field:'purpose', message:'Select your purpose of visit.'};
+    if(val('purpose')==='Other' && !val('purposeOther'))
+      return {field:'purposeOther', message:'Please describe your purpose of visit.'};
+  }
+  return null;
+}
+
+function buildReview(){
+  var mi=val('mi').replace(/\./g,'');
+  var name=val('lastName').toUpperCase()+', '+val('firstName').toUpperCase()+(mi?' '+mi.toUpperCase()+'.':'');
+  var vt=val('visitorType')==='Other' ? 'Other: '+val('visitorTypeOther') : val('visitorType');
+  var pp=val('purpose')==='Other' ? 'Other: '+val('purposeOther') : val('purpose');
+  kv('rev1',[
+    ['Name', name],
+    ['Visitor type', vt],
+    ['Company', val('company').toUpperCase()],
+    ['Contact number', val('contactNo')],
+    ['Address', val('address')]
+  ]);
+  kv('rev2',[
+    ['ID presented', val('idPresented')],
+    ['ID number', val('idNo').toUpperCase()]
+  ]);
+  kv('rev3',[
+    ['Department', val('dept').toUpperCase()],
+    ['Contact person', val('contact')],
+    ['Purpose', pp],
+    ['Remarks', val('remarks')]
+  ]);
+}
+function kv(id, pairs){
+  var dl=$(id); dl.innerHTML='';
+  pairs.forEach(function(p){
+    var d=document.createElement('div'); d.className='kv';
+    var dt=document.createElement('dt'); dt.textContent=p[0];
+    var dd=document.createElement('dd');
+    if(p[1]){ dd.textContent=p[1]; } else { dd.textContent='—'; dd.className='empty'; }
+    d.appendChild(dt); d.appendChild(dd); dl.appendChild(d);
+  });
+}
+
 // ── Register ────────────────────────────────────────────────────────────────
 function doRegister(){
+  // Re-run every step's rules in case a field was changed after review was built.
+  for(var s=1; s<wiz.last; s++){
+    var err=validateStep(s);
+    if(err){ wiz.toReview=true; goStep(s); say('msg2',err.message); flag(err.field); return; }
+  }
   if(pads.sigIn.isEmpty()){ say('msg2','Please sign before submitting.'); return; }
   say('msg2','');
+  $('btnNext').disabled=true;
   busy(true);
   api({
     action:'register',
-    lastName:$('lastName').value, firstName:$('firstName').value, mi:$('mi').value,
-    idPresented:$('idPresented').value, idNo:$('idNo').value,
-    company:$('company').value, contactNo:$('contactNo').value, address:$('address').value,
-    dept:$('dept').value, contact:$('contact').value,
-    purpose:$('purpose').value, purposeOther:$('purposeOther').value,
-    remarks:$('remarks').value, signature:pads.sigIn.data()
+    lastName:val('lastName'), firstName:val('firstName'), mi:val('mi'),
+    visitorType:val('visitorType'), visitorTypeOther:val('visitorTypeOther'),
+    company:val('company'), contactNo:val('contactNo'), address:val('address'),
+    idPresented:val('idPresented'), idNo:val('idNo'),
+    dept:val('dept'), contact:val('contact'),
+    purpose:val('purpose'), purposeOther:val('purposeOther'),
+    remarks:val('remarks'), signature:pads.sigIn.data()
   }).then(function(res){
-    busy(false);
+    busy(false); $('btnNext').disabled=false;
     if(!res.ok){ say('msg2',res.message||'Could not submit.'); show('step-in'); return; }
     $('pendRef').textContent=res.refCode||'';
     $('pendName').textContent=res.name||'';
     show('step-pending');
   }).catch(function(){
-    busy(false); say('msg2','Connection problem. Tap Submit again.'); show('step-in');
+    busy(false); $('btnNext').disabled=false;
+    say('msg2','Connection problem. Tap Submit again.'); show('step-in');
   });
 }
 
@@ -404,7 +620,6 @@ function doLookup(){
   api({action:'lookup', badgeNo:b}).then(function(res){
     busy(false);
     currentBadge = res.badgeNo || b;
-
     if(!res.ok){ say('msg1',res.message||'Something went wrong.'); show('step-badge'); return; }
 
     switch(res.state){
@@ -415,12 +630,12 @@ function doLookup(){
         show('step-out');
         break;
       case 'NONE':
-        say('msg1','No approved visit for badge '+currentBadge+' today. Please see the guard.','warn');
+        say('msg1','No approved visit for badge '+currentBadge+' today. Please see security personnel.','warn');
         show('step-badge');
         break;
       case 'CLOSED':
         say('msg1','Badge '+res.badgeNo+' ('+res.name+') was already timed out at '+
-            res.timeOut+'. Please see the guard.','warn');
+            res.timeOut+'. Please see security personnel.','warn');
         show('step-badge');
         break;
       case 'INVALID':
@@ -444,7 +659,7 @@ function doCheckOut(){
     $('doneTitle').textContent='Signed out';
     $('doneTime').textContent=res.timeOut;
     $('doneName').textContent=res.name;
-    $('doneHint').textContent='Please return badge '+res.badgeNo+' to the guard. Thank you.';
+    $('doneHint').textContent='Please return badge '+res.badgeNo+' to security personnel. Thank you.';
     show('step-done');
   }).catch(function(){
     busy(false); say('msg3','Connection problem. Tap Confirm again.'); show('step-out');
