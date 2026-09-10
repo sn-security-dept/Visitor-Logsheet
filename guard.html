@@ -56,6 +56,7 @@
   .ref{font-weight:700;letter-spacing:.12em;font-variant-numeric:tabular-nums;white-space:nowrap;
     color:var(--brand-dk)}
   .nm{font-weight:600}
+  .addr{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .time{font-variant-numeric:tabular-nums;white-space:nowrap}
   .raw{font-family:Menlo,Consolas,monospace;font-size:13px;background:#FDF4E3;padding:2px 6px;border-radius:4px}
   .acts{white-space:nowrap}
@@ -130,12 +131,15 @@ var open=null;
 var TABS={
   pending:{
     label:'Pending', count:'pending', sortKey:'submittedAt', sortDir:1,   // oldest first: it is a queue
-    search:['refCode','name','dept','idNo'],
-    placeholder:'Search ref code, name, department, ID number…',
+    search:['refCode','name','dept','idNo','company','address'],
+    placeholder:'Search ref code, name, department, ID number, company…',
     cols:[
       {k:'refCode',     t:'Ref'},
       {k:'submittedAt', t:'Submitted', time:true},
       {k:'name',        t:'Name'},
+      {k:'company',     t:'Company'},
+      {k:'contactNo',   t:'Contact no.'},
+      {k:'address',     t:'Address'},
       {k:'idPresented', t:'ID'},
       {k:'idNo',        t:'ID no.'},
       {k:'dept',        t:'Dept'},
@@ -146,11 +150,13 @@ var TABS={
   },
   inside:{
     label:'Inside', count:'inside', sortKey:'timeIn', sortDir:-1,
-    search:['badgeNo','refCode','name','dept','contact','purpose'],
-    placeholder:'Search badge, name, department…',
+    search:['badgeNo','refCode','name','dept','contact','purpose','company'],
+    placeholder:'Search badge, name, department, company…',
     cols:[
       {k:'badgeNo',   t:'Badge'},
       {k:'name',      t:'Name'},
+      {k:'company',   t:'Company'},
+      {k:'contactNo', t:'Contact no.'},
       {k:'dept',      t:'Dept'},
       {k:'contact',   t:'Contact person'},
       {k:'purpose',   t:'Purpose'},
@@ -161,11 +167,12 @@ var TABS={
   },
   done:{
     label:'Signed out', count:'signed out', sortKey:'timeOut', sortDir:-1,
-    search:['badgeNo','refCode','name','dept','contact','purpose'],
-    placeholder:'Search badge, name, department…',
+    search:['badgeNo','refCode','name','dept','contact','purpose','company'],
+    placeholder:'Search badge, name, department, company…',
     cols:[
       {k:'badgeNo',   t:'Badge'},
       {k:'name',      t:'Name'},
+      {k:'company',   t:'Company'},
       {k:'dept',      t:'Dept'},
       {k:'purpose',   t:'Purpose'},
       {k:'timeIn',    t:'Time in', time:true},
@@ -175,12 +182,14 @@ var TABS={
   },
   denied:{
     label:'Denied', count:'denied', sortKey:'submittedAt', sortDir:-1,
-    search:['refCode','name','dept','idNo','deniedReason'],
-    placeholder:'Search ref code, name, department, reason…',
+    search:['refCode','name','dept','idNo','deniedReason','company'],
+    placeholder:'Search ref code, name, department, company, reason…',
     cols:[
       {k:'refCode',     t:'Ref'},
       {k:'submittedAt', t:'Submitted', time:true},
       {k:'name',        t:'Name'},
+      {k:'company',     t:'Company'},
+      {k:'contactNo',   t:'Contact no.'},
       {k:'dept',        t:'Dept'},
       {k:'purpose',     t:'Purpose'},
       {k:'deniedReason',t:'Reason'},
@@ -354,6 +363,9 @@ function cell(c,v){
     case 'refCode':   return '<td class="ref">'+esc(val)+'</td>';
     case 'badgeNo':   return '<td class="badge">'+(val?esc(val):'<span class="dash">—</span>')+'</td>';
     case 'name':      return '<td class="nm">'+esc(val)+'</td>';
+    case 'company':   return '<td>'+(val?esc(val):'<span class="dash">—</span>')+'</td>';
+    case 'address':   return '<td class="addr" title="'+esc(val)+'">'+esc(val)+'</td>';
+    case 'contactNo': return '<td class="time">'+(val?'<a href="tel:'+esc(val)+'">'+esc(val)+'</a>':'<span class="dash">—</span>')+'</td>';
     case 'rawStatus': return '<td><span class="raw">'+(val===''?'(blank)':esc(val))+'</span></td>';
     case 'approvedBy':return '<td>'+(val?'<span class="chk">✓ '+esc(val)+'</span>':'<span class="dash">—</span>')+'</td>';
   }
