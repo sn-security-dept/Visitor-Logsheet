@@ -102,10 +102,24 @@ function setup() {
   var folder = it.hasNext() ? it.next() : DriveApp.createFolder(CONFIG.SIG_FOLDER);
   PropertiesService.getScriptProperties().setProperty('SIG_FOLDER_ID', folder.getId());
 
-  SpreadsheetApp.getUi().alert(
+  notify_(
     'Setup complete.\n\nNext: Deploy > New deployment > Web app.\n' +
     'Then paste the /exec URL into index.html and security-console.html.'
   );
+}
+
+/**
+ * Shows a dialog when a spreadsheet UI is attached, otherwise logs the same
+ * text. Running a function from the Apps Script editor has no UI, and
+ * SpreadsheetApp.getUi() throws "Cannot call ... from this context" there.
+ * The message is only a confirmation, so it must never fail the whole run.
+ */
+function notify_(msg) {
+  try {
+    SpreadsheetApp.getUi().alert(msg);
+  } catch (e) {
+    console.log(msg);
+  }
 }
 
 /** Run once when upgrading — archives the old tab and builds the new layout. */
@@ -116,7 +130,9 @@ function rebuildSheet() {
   var sh = ss.insertSheet(CONFIG.SHEET_NAME);
   writeHeaders_(sh);
   forceTextColumns_(sh);
-  SpreadsheetApp.getUi().alert('New sheet created. The old one was kept and renamed.');
+  notify_(old
+    ? 'New "' + CONFIG.SHEET_NAME + '" created. The old tab was kept as "' + old.getName() + '".'
+    : 'New "' + CONFIG.SHEET_NAME + '" created. There was no existing tab to archive.');
 }
 
 function writeHeaders_(sh) {
