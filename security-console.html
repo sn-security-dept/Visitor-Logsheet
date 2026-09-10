@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#DF6A2E">
-<title>Guard console — Visitor Log</title>
+<title>Security Personnel Console — Visitor Log</title>
 <style>
   :root{--brand:#DF6A2E;--brand-dk:#B94F1A;--brand-tint:#FDF0E7;
     --ink:#1A1512;--paper:#FCFAF8;--line:#E2D9D1;--muted:#726860;--ok:#1F6B45;--bad:#8C1220}
@@ -80,17 +80,17 @@
 <body>
 
 <header>
-  <h1>Guard console &mdash; Visitors Logsheet</h1>
+  <h1>Security Personnel Console &mdash; Visitors Logsheet</h1>
   <span class="date" id="today"></span>
 </header>
 
 <div class="wrap">
   <div id="gate" class="gate">
-    <h2>Guard access</h2>
+    <h2>Security personnel access</h2>
     <p>Enter the console PIN.</p>
     <div id="gateErr" class="err hide"></div>
     <input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="••••">
-    <input id="guardName" class="name" type="text" placeholder="Your name" maxlength="24">
+    <input id="personnelName" class="name" type="text" placeholder="Your name" maxlength="24">
     <button id="btnGate">Open console</button>
   </div>
 
@@ -121,7 +121,7 @@
 // ══ PASTE YOUR APPS SCRIPT /exec URL HERE ══════════════════════════════════
 var API_URL = 'https://script.google.com/macros/s/AKfycbyJ3Gch9Mn-sCgt8kfNB0aItP_AGnnLjvNYxs_JgIonSxP63UAcQmqTU_9JibkGCN7z/exec';
 
-var PIN='', GUARD='', tab='pending', timer=null;
+var PIN='', PERSONNEL='', tab='pending', timer=null;
 var data={pending:[],inside:[],done:[],denied:[],unknown:[]};
 var $=function(i){return document.getElementById(i)};
 
@@ -131,12 +131,13 @@ var open=null;
 var TABS={
   pending:{
     label:'Pending', count:'pending', sortKey:'submittedAt', sortDir:1,   // oldest first: it is a queue
-    search:['refCode','name','dept','idNo','company','address'],
-    placeholder:'Search ref code, name, department, ID number, company…',
+    search:['refCode','name','dept','idNo','company','address','visitorType'],
+    placeholder:'Search ref code, name, type, department, ID number, company…',
     cols:[
       {k:'refCode',     t:'Ref'},
       {k:'submittedAt', t:'Submitted', time:true},
       {k:'name',        t:'Name'},
+      {k:'visitorType', t:'Type'},
       {k:'company',     t:'Company'},
       {k:'contactNo',   t:'Contact no.'},
       {k:'address',     t:'Address'},
@@ -150,11 +151,12 @@ var TABS={
   },
   inside:{
     label:'Inside', count:'inside', sortKey:'timeIn', sortDir:-1,
-    search:['badgeNo','refCode','name','dept','contact','purpose','company'],
-    placeholder:'Search badge, name, department, company…',
+    search:['badgeNo','refCode','name','dept','contact','purpose','company','visitorType'],
+    placeholder:'Search badge, name, type, department, company…',
     cols:[
       {k:'badgeNo',   t:'Badge'},
       {k:'name',      t:'Name'},
+      {k:'visitorType',t:'Type'},
       {k:'company',   t:'Company'},
       {k:'contactNo', t:'Contact no.'},
       {k:'dept',      t:'Dept'},
@@ -167,11 +169,12 @@ var TABS={
   },
   done:{
     label:'Signed out', count:'signed out', sortKey:'timeOut', sortDir:-1,
-    search:['badgeNo','refCode','name','dept','contact','purpose','company'],
-    placeholder:'Search badge, name, department, company…',
+    search:['badgeNo','refCode','name','dept','contact','purpose','company','visitorType'],
+    placeholder:'Search badge, name, type, department, company…',
     cols:[
       {k:'badgeNo',   t:'Badge'},
       {k:'name',      t:'Name'},
+      {k:'visitorType',t:'Type'},
       {k:'company',   t:'Company'},
       {k:'dept',      t:'Dept'},
       {k:'purpose',   t:'Purpose'},
@@ -182,12 +185,13 @@ var TABS={
   },
   denied:{
     label:'Denied', count:'denied', sortKey:'submittedAt', sortDir:-1,
-    search:['refCode','name','dept','idNo','deniedReason','company'],
-    placeholder:'Search ref code, name, department, company, reason…',
+    search:['refCode','name','dept','idNo','deniedReason','company','visitorType'],
+    placeholder:'Search ref code, name, type, department, company, reason…',
     cols:[
       {k:'refCode',     t:'Ref'},
       {k:'submittedAt', t:'Submitted', time:true},
       {k:'name',        t:'Name'},
+      {k:'visitorType', t:'Type'},
       {k:'company',     t:'Company'},
       {k:'contactNo',   t:'Contact no.'},
       {k:'dept',        t:'Dept'},
@@ -217,22 +221,22 @@ var sortKey=TABS.pending.sortKey, sortDir=TABS.pending.sortDir;
 
 /** Plain-string body: a simple request, no preflight. Never add a Content-Type header. */
 function api(p){
-  p.pin=PIN; p.guardName=GUARD;
+  p.pin=PIN; p.personnelName=PERSONNEL;
   return fetch(API_URL,{method:'POST',body:JSON.stringify(p)}).then(function(r){return r.json()});
 }
 
 $('btnGate').addEventListener('click',openConsole);
 $('pin').addEventListener('keydown',function(e){if(e.key==='Enter')openConsole()});
-$('guardName').addEventListener('keydown',function(e){if(e.key==='Enter')openConsole()});
+$('personnelName').addEventListener('keydown',function(e){if(e.key==='Enter')openConsole()});
 
 function openConsole(){
   PIN=$('pin').value.trim();
-  GUARD=$('guardName').value.trim()||'GUARD';
+  PERSONNEL=$('personnelName').value.trim()||'SECURITY';
   if(!PIN){ gateErr('Enter the PIN.'); return; }
   api({action:'today'}).then(function(res){
     if(!res.ok){ gateErr(res.message||'Access denied.'); return; }
     sessionStorage.setItem('vg_pin',PIN);
-    sessionStorage.setItem('vg_name',GUARD);
+    sessionStorage.setItem('vg_name',PERSONNEL);
     $('gate').classList.add('hide');
     $('console').classList.remove('hide');
     switchTab('pending');
@@ -252,7 +256,7 @@ function apply(res){
         denied:res.denied||[],unknown:res.unknown||[]};
   $('today').textContent=res.today||'';
   showErr('');
-  // If the row the guard was acting on has left the pending list, drop the inline form.
+  // If the row someone was acting on has left the pending list, drop the inline form.
   if(open && !data.pending.some(function(v){return v.row===open.row})) open=null;
   renderTabs();
   render();
@@ -477,7 +481,7 @@ $('tabs').addEventListener('click',function(e){
 
 (function(){
   var p=sessionStorage.getItem('vg_pin');
-  if(p){ $('pin').value=p; $('guardName').value=sessionStorage.getItem('vg_name')||''; openConsole(); }
+  if(p){ $('pin').value=p; $('personnelName').value=sessionStorage.getItem('vg_name')||''; openConsole(); }
 })();
 </script>
 </body>
