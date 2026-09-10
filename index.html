@@ -2,363 +2,471 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#DF6A2E">
-<title>Visitor Log — SN Security Department</title>
+<title>Guard console — Visitor Log</title>
 <style>
-  :root{
-    --brand:#DF6A2E; --brand-dk:#B94F1A; --brand-tint:#FDF0E7;
-    --ink:#1A1512; --paper:#FCFAF8; --line:#E2D9D1; --muted:#726860;
-    --ok:#1F6B45; --warn:#8A5A00;
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{--brand:#DF6A2E;--brand-dk:#B94F1A;--brand-tint:#FDF0E7;
+    --ink:#1A1512;--paper:#FCFAF8;--line:#E2D9D1;--muted:#726860;--ok:#1F6B45;--bad:#8C1220}
+  *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);
-    font-family:"Helvetica Neue",Arial,sans-serif;font-size:17px;line-height:1.45}
-  .wrap{max-width:520px;margin:0 auto;padding:0 20px 52px}
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px}
+  header{background:var(--brand);color:#fff;padding:16px 22px;
+    display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+  header h1{margin:0;font-size:18px;font-weight:600}
+  header .date{font-size:14px;opacity:.9}
+  .wrap{max-width:1280px;margin:0 auto;padding:20px 22px 60px}
 
-  header{background:var(--brand);color:#fff;padding:22px 20px 20px;margin-bottom:26px}
-  header .org{font-size:12.5px;letter-spacing:.14em;opacity:.9;margin:0 0 4px}
-  header h1{margin:0;font-size:21px;font-weight:600;letter-spacing:-.01em}
-  header .sub{margin:3px 0 0;font-size:14px;opacity:.85}
+  .gate{max-width:340px;margin:60px auto;text-align:center}
+  .gate h2{font-size:19px;font-weight:600;margin:0 0 6px}
+  .gate p{color:var(--muted);font-size:14.5px;margin:0 0 20px}
+  .gate input{width:100%;padding:14px;font-size:22px;text-align:center;letter-spacing:.3em;
+    border:1.5px solid var(--line);border-radius:7px;background:#fff;font-family:inherit}
+  .gate input.name{font-size:16px;letter-spacing:0;text-align:left;padding:13px 14px;margin-top:10px}
+  .gate input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px rgba(223,106,46,.18)}
+  .gate button{width:100%;margin-top:12px;padding:15px;font-size:16px;font-weight:600;
+    font-family:inherit;border:none;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer}
 
-  h2{font-size:20px;margin:0 0 6px;font-weight:600;letter-spacing:-.01em}
-  .lede{color:var(--muted);font-size:15px;margin:0 0 22px}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tabs button{padding:9px 16px;border:1.5px solid var(--line);background:#fff;
+    border-radius:7px;font-size:14.5px;font-weight:600;font-family:inherit;cursor:pointer;color:var(--muted)}
+  .tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .tabs button.warnTab{border-color:#E3CFA0;color:#8A5A00;background:#FDF4E3}
+  .tabs button.warnTab.on{background:#8A5A00;color:#fff;border-color:#8A5A00}
+  #search{flex:1;min-width:180px;padding:9px 12px;font-size:14.5px;font-family:inherit;
+    border:1.5px solid var(--line);border-radius:7px;background:#fff}
+  #search:focus{outline:none;border-color:var(--brand)}
+  .count{color:var(--muted);font-size:14px;white-space:nowrap}
+  .err{background:#FBEAEC;border:1px solid #E4B4BB;color:var(--bad);
+    padding:12px 14px;border-radius:7px;font-size:14.5px;margin-bottom:16px}
+  .notice{background:#FDF4E3;border:1px solid #E3CFA0;color:#8A5A00;
+    padding:12px 14px;border-radius:7px;font-size:14.5px;margin-bottom:16px}
 
-  label{display:block;font-size:14.5px;font-weight:600;margin:0 0 6px}
-  .req{color:var(--brand-dk);font-weight:400}
-  input,select{width:100%;padding:13px 14px;font-size:17px;font-family:inherit;
-    border:1.5px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
-  input:focus,select:focus{outline:none;border-color:var(--brand);
-    box-shadow:0 0 0 3px rgba(223,106,46,.18)}
-  .field{margin-bottom:17px}
-  .row{display:flex;gap:11px}
-  .row .field{flex:1}
-  .row .field.mi{flex:0 0 82px}
-  #passInput{font-size:30px;letter-spacing:.18em;text-align:center;font-weight:600;padding:16px}
-
-  button{width:100%;padding:16px;font-size:17px;font-weight:600;font-family:inherit;
-    border:none;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer}
-  button:active{background:var(--brand-dk)}
-  button:disabled{opacity:.5}
-  button.ghost{background:none;color:var(--brand-dk);border:1.5px solid var(--line);margin-top:10px}
-  button:focus-visible{outline:3px solid var(--brand-dk);outline-offset:2px}
-
-  .sigbox{border:1.5px solid var(--line);border-radius:7px;background:#fff;overflow:hidden}
-  canvas{display:block;width:100%;height:170px;touch-action:none}
-  .sigfoot{display:flex;justify-content:space-between;align-items:center;
-    padding:8px 12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
-  .sigfoot button{width:auto;padding:4px 10px;background:none;color:var(--brand-dk);font-size:13.5px}
-
-  .card{background:var(--brand-tint);border:1.5px solid var(--line);
-    border-left:5px solid var(--brand);padding:18px 20px;margin-bottom:22px}
-  .card .nm{font-size:20px;font-weight:600;margin:0 0 3px}
-  .card .meta{font-size:14.5px;color:var(--muted);margin:0}
-  .card .tin{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);font-size:15px}
-  .card .tin b{font-variant-numeric:tabular-nums}
-
-  .msg{padding:13px 15px;border-radius:7px;font-size:15px;margin-bottom:20px;display:none}
-  .msg.err{background:#FBEAEC;border:1px solid #E4B4BB;color:#8C1220;display:block}
-  .msg.warn{background:#FDF4E3;border:1px solid #E3CFA0;color:var(--warn);display:block}
-
-  .done{text-align:center;padding:46px 10px}
-  .done .tick{width:64px;height:64px;border-radius:50%;background:var(--ok);color:#fff;
-    font-size:34px;line-height:64px;margin:0 auto 20px}
-  .done h2{font-size:23px}
-  .done .stamp{font-size:38px;font-weight:600;font-variant-numeric:tabular-nums;
-    margin:14px 0 4px;color:var(--brand-dk)}
-  .done .nm{font-size:17px;font-weight:600}
-  .done .hint{color:var(--muted);font-size:14.5px;margin-top:22px}
-
-  .consent{font-size:12.5px;color:var(--muted);line-height:1.55;
-    border-top:1px solid var(--line);padding-top:16px;margin-top:24px}
-  .spin{text-align:center;padding:52px 0;color:var(--muted)}
+  .tablebox{background:#fff;border:1.5px solid var(--line);border-radius:8px;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{background:var(--brand-tint);text-align:left;padding:11px 12px;font-weight:600;
+    white-space:nowrap;border-bottom:1.5px solid var(--line);cursor:pointer;user-select:none}
+  th.nosort{cursor:default}
+  th .car{color:var(--muted);font-size:11px;margin-left:3px}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr.out td{color:var(--muted)}
+  .badge{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ref{font-weight:700;letter-spacing:.12em;font-variant-numeric:tabular-nums;white-space:nowrap;
+    color:var(--brand-dk)}
+  .nm{font-weight:600}
+  .time{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .raw{font-family:Menlo,Consolas,monospace;font-size:13px;background:#FDF4E3;padding:2px 6px;border-radius:4px}
+  .acts{white-space:nowrap}
+  .acts button{padding:6px 11px;border:1.5px solid var(--line);background:#fff;
+    border-radius:6px;font-size:13.5px;font-family:inherit;cursor:pointer;margin-right:6px}
+  .acts button.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .acts button.dny{color:var(--bad);border-color:#E4B4BB}
+  .acts button:disabled{opacity:.5;cursor:default}
+  .acts input{padding:6px 9px;font-size:14px;font-family:inherit;border:1.5px solid var(--line);
+    border-radius:6px;margin-right:6px;background:#fff}
+  .acts input.bd{width:90px;font-size:16px;letter-spacing:.15em;text-align:center;font-weight:600}
+  .acts input.rs{width:220px}
+  .acts input:focus{outline:none;border-color:var(--brand)}
+  .acts .ferr{display:block;color:var(--bad);font-size:12.5px;margin-top:4px;white-space:normal}
+  .chk{color:var(--ok);font-weight:600;white-space:nowrap}
+  .dash{color:var(--muted)}
+  .empty{text-align:center;color:var(--muted);padding:44px 0}
   .hide{display:none}
 </style>
 </head>
 <body>
 
 <header>
-  <p class="org">SN SECURITY DEPARTMENT</p>
-  <h1>Visitors Logsheet</h1>
-  <p class="sub">Staff Entrance</p>
+  <h1>Guard console &mdash; Visitors Logsheet</h1>
+  <span class="date" id="today"></span>
 </header>
 
 <div class="wrap">
-
-  <div id="step-pass">
-    <h2>Enter your pass number</h2>
-    <p class="lede">The number on the temporary pass the guard gave you.</p>
-    <div id="msg1" class="msg"></div>
-    <div class="field">
-      <input id="passInput" type="text" inputmode="numeric" autocomplete="off"
-             placeholder="0000" maxlength="6" aria-label="Temporary pass number">
-    </div>
-    <button id="btnLookup">Continue</button>
+  <div id="gate" class="gate">
+    <h2>Guard access</h2>
+    <p>Enter the console PIN.</p>
+    <div id="gateErr" class="err hide"></div>
+    <input id="pin" type="password" inputmode="numeric" maxlength="8" placeholder="••••">
+    <input id="guardName" class="name" type="text" placeholder="Your name" maxlength="24">
+    <button id="btnGate">Open console</button>
   </div>
 
-  <div id="step-in" class="hide">
-    <h2>Sign in</h2>
-    <p class="lede">Pass <b id="inPass"></b></p>
-    <div id="msg2" class="msg"></div>
-
-    <div class="field"><label>Last name <span class="req">*</span></label>
-      <input id="lastName" autocomplete="family-name" autocapitalize="words"></div>
-    <div class="row">
-      <div class="field"><label>First name <span class="req">*</span></label>
-        <input id="firstName" autocomplete="given-name" autocapitalize="words"></div>
-      <div class="field mi"><label>M.I.</label><input id="mi" maxlength="2"></div>
-    </div>
-    <div class="field"><label>ID presented <span class="req">*</span></label>
-      <select id="idPresented"><option value="">Select ID</option></select></div>
-    <div class="field"><label>ID number <span class="req">*</span></label>
-      <input id="idNo" autocomplete="off" autocapitalize="characters" spellcheck="false"
-             placeholder="As shown on your ID"></div>
-    <div class="field"><label>Department visiting <span class="req">*</span></label>
-      <input id="dept" placeholder="e.g. HR" autocapitalize="characters"></div>
-    <div class="field"><label>Contact person <span class="req">*</span></label>
-      <input id="contact" placeholder="e.g. Ms. Sophia Mabaet" autocapitalize="words"></div>
-    <div class="field"><label>Remarks</label><input id="remarks" placeholder="Optional"></div>
-
-    <div class="field">
-      <label>Signature <span class="req">*</span></label>
-      <div class="sigbox">
-        <canvas id="sigIn"></canvas>
-        <div class="sigfoot"><span>Sign with your finger</span>
-          <button type="button" data-clear="sigIn">Clear</button></div>
+  <div id="console" class="hide">
+    <div id="err" class="err hide"></div>
+    <div id="unkNote" class="notice hide"></div>
+    <div class="bar">
+      <div class="tabs" id="tabs">
+        <button data-tab="pending" class="on">Pending</button>
+        <button data-tab="inside">Inside</button>
+        <button data-tab="done">Signed out</button>
+        <button data-tab="denied">Denied</button>
+        <button data-tab="unknown" class="warnTab hide">Unrecognised</button>
       </div>
+      <input id="search" type="search" placeholder="Search…">
+      <span class="count" id="count"></span>
     </div>
-
-    <p class="consent">By signing, you authorise the Company to obtain, collect, use, process,
-      share and retain your personal information for security and identification purposes as
-      indicated in the Privacy Policy, and to retain adequate documentation of said information
-      for five (5) years from the date of processing.</p>
-
-    <button id="btnCheckIn" style="margin-top:18px">Submit and record time in</button>
-    <button class="ghost" data-back>Back</button>
-  </div>
-
-  <div id="step-out" class="hide">
-    <h2>Sign out</h2>
-    <p class="lede">Check your details, then sign.</p>
-    <div id="msg3" class="msg"></div>
-    <div class="card">
-      <p class="nm" id="outName"></p>
-      <p class="meta" id="outMeta"></p>
-      <p class="tin">Time in <b id="outTimeIn"></b></p>
-    </div>
-    <div class="field">
-      <label>Signature <span class="req">*</span></label>
-      <div class="sigbox">
-        <canvas id="sigOut"></canvas>
-        <div class="sigfoot"><span>Sign with your finger</span>
-          <button type="button" data-clear="sigOut">Clear</button></div>
-      </div>
-    </div>
-    <button id="btnCheckOut">Confirm time out</button>
-    <button class="ghost" data-back>Back</button>
-  </div>
-
-  <div id="step-done" class="hide">
-    <div class="done">
-      <div class="tick">&#10003;</div>
-      <h2 id="doneTitle"></h2>
-      <div class="stamp" id="doneTime"></div>
-      <div class="nm" id="doneName"></div>
-      <p class="hint" id="doneHint"></p>
-      <button class="ghost" data-back style="margin-top:20px">Done</button>
+    <div class="tablebox">
+      <table>
+        <thead><tr id="head"></tr></thead>
+        <tbody id="body"></tbody>
+      </table>
     </div>
   </div>
-
-  <div id="spin" class="spin hide">Saving&hellip;</div>
 </div>
 
 <script>
 // ══ PASTE YOUR APPS SCRIPT /exec URL HERE ══════════════════════════════════
-var API_URL = 'https://script.google.com/macros/s/AKfycbyJ3Gch9Mn-sCgt8kfNB0aItP_AGnnLjvNYxs_JgIonSxP63UAcQmqTU_9JibkGCN7z/exec';
-var PASS_LENGTH = 4;
+var API_URL = 'https://script.google.com/macros/s/PASTE_YOUR_DEPLOYMENT_ID/exec';
 
-/**
- * Body is sent as a plain string, so the browser treats this as a simple
- * request and skips the CORS preflight. Apps Script cannot answer a preflight,
- * so never set a Content-Type header here.
- */
-function api(payload){
-  return fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
-    .then(function(r){ return r.json(); });
+var PIN='', GUARD='', tab='pending', timer=null;
+var data={pending:[],inside:[],done:[],denied:[],unknown:[]};
+var $=function(i){return document.getElementById(i)};
+
+/* One open inline action at a time: {row, kind:'approve'|'deny', value, err} */
+var open=null;
+
+var TABS={
+  pending:{
+    label:'Pending', count:'pending', sortKey:'submittedAt', sortDir:1,   // oldest first: it is a queue
+    search:['refCode','name','dept','idNo'],
+    placeholder:'Search ref code, name, department, ID number…',
+    cols:[
+      {k:'refCode',     t:'Ref'},
+      {k:'submittedAt', t:'Submitted', time:true},
+      {k:'name',        t:'Name'},
+      {k:'idPresented', t:'ID'},
+      {k:'idNo',        t:'ID no.'},
+      {k:'dept',        t:'Dept'},
+      {k:'contact',     t:'Contact person'},
+      {k:'purpose',     t:'Purpose'}
+    ],
+    actions:true
+  },
+  inside:{
+    label:'Inside', count:'inside', sortKey:'timeIn', sortDir:-1,
+    search:['badgeNo','refCode','name','dept','contact','purpose'],
+    placeholder:'Search badge, name, department…',
+    cols:[
+      {k:'badgeNo',   t:'Badge'},
+      {k:'name',      t:'Name'},
+      {k:'dept',      t:'Dept'},
+      {k:'contact',   t:'Contact person'},
+      {k:'purpose',   t:'Purpose'},
+      {k:'timeIn',    t:'Time in', time:true},
+      {k:'approvedBy',t:'Approved by'}
+    ],
+    actions:true
+  },
+  done:{
+    label:'Signed out', count:'signed out', sortKey:'timeOut', sortDir:-1,
+    search:['badgeNo','refCode','name','dept','contact','purpose'],
+    placeholder:'Search badge, name, department…',
+    cols:[
+      {k:'badgeNo',   t:'Badge'},
+      {k:'name',      t:'Name'},
+      {k:'dept',      t:'Dept'},
+      {k:'purpose',   t:'Purpose'},
+      {k:'timeIn',    t:'Time in', time:true},
+      {k:'timeOut',   t:'Time out', time:true},
+      {k:'approvedBy',t:'Approved by'}
+    ]
+  },
+  denied:{
+    label:'Denied', count:'denied', sortKey:'submittedAt', sortDir:-1,
+    search:['refCode','name','dept','idNo','deniedReason'],
+    placeholder:'Search ref code, name, department, reason…',
+    cols:[
+      {k:'refCode',     t:'Ref'},
+      {k:'submittedAt', t:'Submitted', time:true},
+      {k:'name',        t:'Name'},
+      {k:'dept',        t:'Dept'},
+      {k:'purpose',     t:'Purpose'},
+      {k:'deniedReason',t:'Reason'},
+      {k:'approvedBy',  t:'Denied by'}
+    ]
+  },
+  unknown:{
+    label:'Unrecognised', count:'unrecognised', sortKey:'row', sortDir:-1,
+    search:['rawStatus','refCode','badgeNo','name','dept'],
+    placeholder:'Search status, ref code, badge, name…',
+    cols:[
+      {k:'row',         t:'Sheet row'},
+      {k:'rawStatus',   t:'STATUS cell'},
+      {k:'refCode',     t:'Ref'},
+      {k:'badgeNo',     t:'Badge'},
+      {k:'name',        t:'Name'},
+      {k:'dept',        t:'Dept'},
+      {k:'submittedAt', t:'Submitted', time:true},
+      {k:'timeIn',      t:'Time in', time:true},
+      {k:'timeOut',     t:'Time out', time:true}
+    ]
+  }
+};
+var sortKey=TABS.pending.sortKey, sortDir=TABS.pending.sortDir;
+
+/** Plain-string body: a simple request, no preflight. Never add a Content-Type header. */
+function api(p){
+  p.pin=PIN; p.guardName=GUARD;
+  return fetch(API_URL,{method:'POST',body:JSON.stringify(p)}).then(function(r){return r.json()});
 }
 
-/** Same rule as the server: digits only, padded. 12 and 0012 are one pass. */
-function normPass(v){
-  var d = String(v||'').replace(/\D/g,'');
+$('btnGate').addEventListener('click',openConsole);
+$('pin').addEventListener('keydown',function(e){if(e.key==='Enter')openConsole()});
+$('guardName').addEventListener('keydown',function(e){if(e.key==='Enter')openConsole()});
+
+function openConsole(){
+  PIN=$('pin').value.trim();
+  GUARD=$('guardName').value.trim()||'GUARD';
+  if(!PIN){ gateErr('Enter the PIN.'); return; }
+  api({action:'today'}).then(function(res){
+    if(!res.ok){ gateErr(res.message||'Access denied.'); return; }
+    sessionStorage.setItem('vg_pin',PIN);
+    sessionStorage.setItem('vg_name',GUARD);
+    $('gate').classList.add('hide');
+    $('console').classList.remove('hide');
+    switchTab('pending');
+    apply(res);
+    if(!timer) timer=setInterval(load,20000);
+  }).catch(function(){ gateErr('Cannot reach the server.') });
+}
+function gateErr(m){ var e=$('gateErr'); e.textContent=m; e.classList.remove('hide'); }
+function showErr(m){ var e=$('err'); e.textContent=m||''; e.classList.toggle('hide',!m); }
+
+function load(){
+  api({action:'today'}).then(function(r){ if(r.ok) apply(r); else showErr(r.message); })
+    .catch(function(){});
+}
+function apply(res){
+  data={pending:res.pending||[],inside:res.inside||[],done:res.done||[],
+        denied:res.denied||[],unknown:res.unknown||[]};
+  $('today').textContent=res.today||'';
+  showErr('');
+  // If the row the guard was acting on has left the pending list, drop the inline form.
+  if(open && !data.pending.some(function(v){return v.row===open.row})) open=null;
+  renderTabs();
+  render();
+}
+
+function renderTabs(){
+  document.querySelectorAll('#tabs button').forEach(function(b){
+    var k=b.dataset.tab, n=data[k].length;
+    if(k==='pending') b.textContent='Pending ('+n+')';
+    else if(k==='unknown'){ b.textContent='Unrecognised ('+n+')'; b.classList.toggle('hide',n===0); }
+    else b.textContent=TABS[k].label;
+    b.classList.toggle('on',k===tab);
+  });
+  var u=$('unkNote');
+  if(data.unknown.length){
+    u.textContent=data.unknown.length+' row(s) today have a STATUS the console does not recognise. '+
+      'They are listed under Unrecognised. Fix the STATUS cell in the sheet to one of '+
+      'PENDING, APPROVED, DENIED or CLOSED.';
+    u.classList.remove('hide');
+  }else u.classList.add('hide');
+  if(tab==='unknown' && !data.unknown.length) switchTab('pending');
+}
+
+function switchTab(k){
+  tab=k; open=null;
+  sortKey=TABS[k].sortKey; sortDir=TABS[k].sortDir;
+  $('search').placeholder=TABS[k].placeholder;
+  buildHead();
+  renderTabs();
+  render();
+}
+
+function buildHead(){
+  var t=TABS[tab];
+  $('head').innerHTML = t.cols.map(function(c){
+    return '<th data-sort="'+c.k+'">'+c.t+'<span class="car" data-car="'+c.k+'"></span></th>';
+  }).join('') + (t.actions ? '<th class="nosort">Actions</th>' : '');
+}
+
+$('head').addEventListener('click',function(e){
+  var th=e.target.closest('th[data-sort]'); if(!th) return;
+  var k=th.dataset.sort;
+  if(sortKey===k){ sortDir=-sortDir; } else { sortKey=k; sortDir=1; }
+  render();
+});
+
+function isTimeCol(k){
+  return TABS[tab].cols.some(function(c){ return c.k===k && c.time; });
+}
+
+function rows(){
+  var t=TABS[tab];
+  var list=(data[tab]||[]).slice();
+  var q=$('search').value.trim().toLowerCase();
+  if(q){
+    list=list.filter(function(v){
+      return t.search.map(function(k){return v[k]}).join(' ').toLowerCase().indexOf(q)!==-1;
+    });
+  }
+  var timeCol=isTimeCol(sortKey);
+  list.sort(function(a,b){
+    var x=a[sortKey], y=b[sortKey];
+    if(timeCol){ return (mins(x)-mins(y))*sortDir; }
+    if(sortKey==='row'){ return (Number(x)-Number(y))*sortDir; }
+    return String(x==null?'':x).localeCompare(String(y==null?'':y))*sortDir;
+  });
+  return list;
+}
+
+/** "1:05 PM" -> minutes since midnight, so time columns sort correctly. */
+function mins(s){
+  var m=String(s==null?'':s).match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if(!m) return -1;
+  var h=parseInt(m[1],10)%12, mm=parseInt(m[2],10);
+  if(m[3] && m[3].toUpperCase()==='PM') h+=12;
+  return h*60+mm;
+}
+
+function render(){
+  var t=TABS[tab], list=rows();
+  $('count').textContent = list.length+' '+t.count;
+
+  document.querySelectorAll('[data-car]').forEach(function(s){
+    s.textContent = (s.dataset.car===sortKey) ? (sortDir>0?'▲':'▼') : '';
+  });
+
+  var span=t.cols.length+(t.actions?1:0);
+  if(!list.length){
+    $('body').innerHTML='<tr><td colspan="'+span+'"><div class="empty">Nothing to show.</div></td></tr>';
+    return;
+  }
+
+  $('body').innerHTML = list.map(function(v){
+    var cells=t.cols.map(function(c){ return cell(c,v); }).join('');
+    var acts = t.actions ? '<td class="acts">'+actions(v)+'</td>' : '';
+    return '<tr class="'+(tab==='done'?'out':'')+'" data-row="'+v.row+'">'+cells+acts+'</tr>';
+  }).join('');
+
+  if(open){
+    var inp=document.querySelector('tr[data-row="'+open.row+'"] input');
+    if(inp){ inp.focus(); var L=inp.value.length; try{inp.setSelectionRange(L,L)}catch(e){} }
+  }
+}
+
+function cell(c,v){
+  var val=v[c.k];
+  switch(c.k){
+    case 'refCode':   return '<td class="ref">'+esc(val)+'</td>';
+    case 'badgeNo':   return '<td class="badge">'+(val?esc(val):'<span class="dash">—</span>')+'</td>';
+    case 'name':      return '<td class="nm">'+esc(val)+'</td>';
+    case 'rawStatus': return '<td><span class="raw">'+(val===''?'(blank)':esc(val))+'</span></td>';
+    case 'approvedBy':return '<td>'+(val?'<span class="chk">✓ '+esc(val)+'</span>':'<span class="dash">—</span>')+'</td>';
+  }
+  if(c.time) return '<td class="time">'+(val?esc(val):'<span class="dash">—</span>')+'</td>';
+  return '<td>'+esc(val)+'</td>';
+}
+
+function actions(v){
+  if(tab==='inside'){
+    return '<button data-force="'+v.row+'">Close out</button>';
+  }
+  if(tab!=='pending') return '';
+  if(open && open.row===v.row){
+    var err = open.err ? '<span class="ferr">'+esc(open.err)+'</span>' : '';
+    if(open.kind==='approve'){
+      return '<input class="bd" data-in="badge" inputmode="numeric" maxlength="6" placeholder="0000" '+
+             'value="'+esc(open.value)+'" aria-label="Badge number to issue">'+
+             '<button class="pri" data-confirm="approve"'+(open.busy?' disabled':'')+'>Issue badge</button>'+
+             '<button data-cancel="1">Cancel</button>'+err;
+    }
+    var can = String(open.value||'').trim().length>0 && !open.busy;
+    return '<input class="rs" data-in="reason" maxlength="200" placeholder="Reason (required)" '+
+           'value="'+esc(open.value)+'" aria-label="Reason for denying">'+
+           '<button class="dny" data-confirm="deny"'+(can?'':' disabled')+'>Deny</button>'+
+           '<button data-cancel="1">Cancel</button>'+err;
+  }
+  return '<button class="pri" data-approve="'+v.row+'">Approve</button>'+
+         '<button class="dny" data-deny="'+v.row+'">Deny</button>';
+}
+
+function esc(s){var d=document.createElement('div');d.textContent=(s==null?'':s);return d.innerHTML}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+$('body').addEventListener('click',function(e){
+  var b=e.target.closest('button'); if(!b) return;
+
+  if(b.dataset.approve){ open={row:Number(b.dataset.approve),kind:'approve',value:'',err:''}; render(); return; }
+  if(b.dataset.deny){    open={row:Number(b.dataset.deny),   kind:'deny',   value:'',err:''}; render(); return; }
+  if(b.dataset.cancel){  open=null; render(); return; }
+
+  if(b.dataset.confirm==='approve'){ submitApprove(); return; }
+  if(b.dataset.confirm==='deny'){    submitDeny();    return; }
+
+  if(b.dataset.force){
+    var note=prompt('Reason for manual time out:','Left without scanning');
+    if(note===null) return;
+    b.disabled=true;
+    api({action:'force', row:Number(b.dataset.force), note:note}).then(function(r){
+      if(!r.ok) alert(r.message);
+      load();
+    }).catch(function(){ alert('Cannot reach the server.'); load(); });
+  }
+});
+
+/* Track typing in the inline inputs without re-rendering on every keystroke,
+   except for Deny, where the button must enable once the reason is non-empty. */
+$('body').addEventListener('input',function(e){
+  var inp=e.target.closest('input[data-in]'); if(!inp||!open) return;
+  var was=String(open.value||'').trim().length>0;
+  open.value=inp.value;
+  var now=String(open.value||'').trim().length>0;
+  if(open.kind==='deny' && was!==now){
+    var btn=document.querySelector('tr[data-row="'+open.row+'"] button[data-confirm="deny"]');
+    if(btn) btn.disabled=!now||!!open.busy;
+  }
+});
+$('body').addEventListener('keydown',function(e){
+  var inp=e.target.closest('input[data-in]'); if(!inp||!open) return;
+  if(e.key==='Enter'){ e.preventDefault(); open.kind==='approve'?submitApprove():submitDeny(); }
+  if(e.key==='Escape'){ open=null; render(); }
+});
+
+function submitApprove(){
+  if(!open||open.kind!=='approve'||open.busy) return;
+  var b=normBadge(open.value);
+  if(!b){ open.err='Enter the badge number.'; render(); return; }
+  open.value=b; open.err=''; open.busy=true; render();
+  api({action:'approve', row:open.row, badgeNo:b}).then(function(r){
+    if(!r.ok){ if(open){ open.busy=false; open.err=r.message||'Could not approve.'; } render(); load(); return; }
+    open=null; load();
+  }).catch(function(){ if(open){ open.busy=false; open.err='Cannot reach the server.'; } render(); });
+}
+
+function submitDeny(){
+  if(!open||open.kind!=='deny'||open.busy) return;
+  var reason=String(open.value||'').trim();
+  if(!reason){ open.err='A reason is required.'; render(); return; }
+  open.err=''; open.busy=true; render();
+  api({action:'deny', row:open.row, reason:reason}).then(function(r){
+    if(!r.ok){ if(open){ open.busy=false; open.err=r.message||'Could not deny.'; } render(); load(); return; }
+    open=null; load();
+  }).catch(function(){ if(open){ open.busy=false; open.err='Cannot reach the server.'; } render(); });
+}
+
+/** Same rule as the server: digits only, padded to 4. */
+function normBadge(v){
+  var d=String(v||'').replace(/\D/g,'');
   if(!d) return '';
-  d = d.slice(-PASS_LENGTH);
-  while(d.length < PASS_LENGTH) d = '0' + d;
+  d=d.slice(-4);
+  while(d.length<4) d='0'+d;
   return d;
 }
 
-function Pad(canvas){
-  var ctx=canvas.getContext('2d'), drawing=false, dirty=false, last=null;
-  function size(){
-    var r=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
-    var prev = dirty ? canvas.toDataURL() : null;
-    canvas.width=r.width*dpr; canvas.height=r.height*dpr;
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    ctx.lineCap='round'; ctx.lineJoin='round';
-    ctx.strokeStyle='#1A1512'; ctx.lineWidth=2.1;
-    if(prev){var i=new Image();i.onload=function(){ctx.drawImage(i,0,0,r.width,r.height)};i.src=prev}
-  }
-  function pt(e){var r=canvas.getBoundingClientRect(),t=e.touches?e.touches[0]:e;
-    return {x:t.clientX-r.left,y:t.clientY-r.top}}
-  function start(e){e.preventDefault();drawing=true;dirty=true;last=pt(e)}
-  function move(e){if(!drawing)return;e.preventDefault();var p=pt(e);
-    ctx.beginPath();ctx.moveTo(last.x,last.y);
-    ctx.quadraticCurveTo(last.x,last.y,(last.x+p.x)/2,(last.y+p.y)/2);ctx.stroke();last=p}
-  function end(){drawing=false}
-  canvas.addEventListener('mousedown',start);canvas.addEventListener('touchstart',start,{passive:false});
-  canvas.addEventListener('mousemove',move);canvas.addEventListener('touchmove',move,{passive:false});
-  ['mouseup','mouseleave','touchend','touchcancel'].forEach(function(ev){canvas.addEventListener(ev,end)});
-  window.addEventListener('resize',size); size();
-  return {clear:function(){ctx.clearRect(0,0,canvas.width,canvas.height);dirty=false},
-    isEmpty:function(){return !dirty},
-    data:function(){return dirty?canvas.toDataURL('image/png'):''},resize:size};
-}
-
-var pads={}, currentPass='';
-var $=function(id){return document.getElementById(id)};
-
-function show(id){
-  ['step-pass','step-in','step-out','step-done'].forEach(function(s){
-    $(s).classList.toggle('hide', s!==id);
-  });
-  $('spin').classList.add('hide');
-  window.scrollTo(0,0);
-  if(id==='step-in') pads.sigIn.resize();
-  if(id==='step-out') pads.sigOut.resize();
-}
-function busy(on){
-  $('spin').classList.toggle('hide',!on);
-  ['step-pass','step-in','step-out'].forEach(function(s){
-    if(!$(s).classList.contains('hide')) $(s).style.display = on?'none':'';
-  });
-}
-function say(box,text,kind){
-  var el=$(box);
-  el.className = text ? 'msg '+(kind||'err') : 'msg';
-  el.textContent = text||'';
-}
-function reset(){
-  currentPass=''; $('passInput').value='';
-  ['lastName','firstName','mi','idNo','dept','contact','remarks'].forEach(function(f){$(f).value=''});
-  $('idPresented').value='';
-  pads.sigIn.clear(); pads.sigOut.clear();
-  say('msg1','');say('msg2','');say('msg3','');
-  show('step-pass');
-}
-
-window.addEventListener('load',function(){
-  pads.sigIn=Pad($('sigIn'));
-  pads.sigOut=Pad($('sigOut'));
-
-  document.querySelectorAll('[data-clear]').forEach(function(b){
-    b.addEventListener('click',function(){pads[b.dataset.clear].clear()});
-  });
-  document.querySelectorAll('[data-back]').forEach(function(b){
-    b.addEventListener('click',reset);
-  });
-
-  api({action:'config'}).then(function(res){
-    if(!res.ok) return;
-    PASS_LENGTH = res.passLength || 4;
-    var sel=$('idPresented');
-    res.idTypes.forEach(function(t){
-      var o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o);
-    });
-  }).catch(function(){
-    say('msg1','Cannot reach the server. Check your connection.');
-  });
-
-  $('passInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLookup(); });
-  $('btnLookup').addEventListener('click',doLookup);
-  $('btnCheckIn').addEventListener('click',doCheckIn);
-  $('btnCheckOut').addEventListener('click',doCheckOut);
-  $('passInput').focus();
+$('search').addEventListener('input',render);
+$('tabs').addEventListener('click',function(e){
+  var b=e.target.closest('button[data-tab]'); if(!b) return;
+  switchTab(b.dataset.tab);
 });
 
-function doLookup(){
-  var typed=$('passInput').value;
-  var p=normPass(typed);
-  if(!p){ say('msg1','Enter your pass number.'); return; }
-  $('passInput').value = p;
-  say('msg1','');
-  busy(true);
-
-  api({action:'lookup', passNo:p}).then(function(res){
-    busy(false);
-    currentPass = res.passNo || p;
-
-    if(res.state==='INVALID'){ say('msg1',res.message); show('step-pass'); return; }
-
-    if(res.state==='NEW'){
-      $('inPass').textContent=currentPass;
-      show('step-in');
-
-    }else if(res.state==='OPEN'){
-      $('outName').textContent=res.name;
-      $('outMeta').textContent=[res.dept,res.contact].filter(Boolean).join(' \u00B7 ');
-      $('outTimeIn').textContent=res.timeIn;
-      show('step-out');
-
-    }else if(res.state==='CLOSED'){
-      say('msg1','Pass '+res.passNo+' ('+res.name+') was already timed out at '+
-          res.timeOut+'. Please see the guard.','warn');
-      show('step-pass');
-    }
-  }).catch(function(){
-    busy(false); say('msg1','Connection problem. Tap Continue again.');
-  });
-}
-
-function doCheckIn(){
-  if(pads.sigIn.isEmpty()){ say('msg2','Please sign before submitting.'); return; }
-  say('msg2','');
-  busy(true);
-  api({
-    action:'checkin', passNo:currentPass,
-    lastName:$('lastName').value, firstName:$('firstName').value, mi:$('mi').value,
-    idPresented:$('idPresented').value, idNo:$('idNo').value,
-    dept:$('dept').value, contact:$('contact').value, remarks:$('remarks').value,
-    signature:pads.sigIn.data()
-  }).then(function(res){
-    busy(false);
-    if(!res.ok){ say('msg2',res.message); show('step-in'); return; }
-    $('doneTitle').textContent='Signed in';
-    $('doneTime').textContent=res.timeIn;
-    $('doneName').textContent=res.name;
-    $('doneHint').textContent='Keep pass '+res.passNo+
-      ' with you. Scan again and enter the same number when you leave.';
-    show('step-done');
-  }).catch(function(){
-    busy(false); say('msg2','Connection problem. Tap Submit again.');
-  });
-}
-
-function doCheckOut(){
-  if(pads.sigOut.isEmpty()){ say('msg3','Please sign before confirming.'); return; }
-  say('msg3','');
-  busy(true);
-  api({action:'checkout', passNo:currentPass, signature:pads.sigOut.data()})
-  .then(function(res){
-    busy(false);
-    if(!res.ok){ say('msg3',res.message); show('step-out'); return; }
-    $('doneTitle').textContent='Signed out';
-    $('doneTime').textContent=res.timeOut;
-    $('doneName').textContent=res.name;
-    $('doneHint').textContent='Please return pass '+res.passNo+' to the guard. Thank you.';
-    show('step-done');
-  }).catch(function(){
-    busy(false); say('msg3','Connection problem. Tap Confirm again.');
-  });
-}
+(function(){
+  var p=sessionStorage.getItem('vg_pin');
+  if(p){ $('pin').value=p; $('guardName').value=sessionStorage.getItem('vg_name')||''; openConsole(); }
+})();
 </script>
 </body>
 </html>
