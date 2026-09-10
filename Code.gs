@@ -34,8 +34,14 @@ var CONFIG = {
   TZ: 'Asia/Manila',
   BADGE_LENGTH: 4,                // badge numbers are padded to this many digits
   ENFORCE_BADGE_WHITELIST: false, // true = only numbers listed in VALID BADGES may be issued
-  // The security console PIN lives in Project Settings > Script Properties
-  // under the key SECURITY_PIN, never here. Set it once with setSecurityPin('....').
+
+  // ── Security console PIN ────────────────────────────────────────────────
+  // LEAVE THIS EMPTY. It is a signpost only — nothing reads it, and a value
+  // typed here would be published to the public repo, not applied.
+  // The real PIN lives in Project Settings > Script Properties under the key
+  // SECURITY_PIN. Set it once with setSecurityPin('....'); see that function.
+  SECURITY_PIN: '',
+
   BRAND: '#DF6A2E',
   REF_LENGTH: 4,
   // No 0/O, 1/I/L, B/8, S/5, Z/2 confusion when read aloud or off a phone screen.
@@ -314,6 +320,12 @@ function checkOut(d) {
  * console action is refused — fail closed, no default.
  */
 function securityAuth_(d) {
+  // CONFIG.SECURITY_PIN is never consulted. If someone typed a PIN there,
+  // say so in the log — otherwise the console just says "Wrong PIN" forever.
+  if (String(CONFIG.SECURITY_PIN || '').trim()) {
+    console.warn('CONFIG.SECURITY_PIN is set but is never read. Clear it and ' +
+                 'run setSecurityPin() instead — the PIN belongs in Script Properties.');
+  }
   var stored = PropertiesService.getScriptProperties().getProperty('SECURITY_PIN');
   if (!stored || !String(stored).trim()) return false;
   return String(d && d.pin || '') === String(stored).trim();
