@@ -37,10 +37,10 @@ Old layout had 15 columns. New layout has 23. Asterisks mark new columns.
 | 11 | CONTACT PERSON | |
 | 12 | PURPOSE OF VISIT | |
 | 13 | * STATUS | `PENDING`, `APPROVED`, `DENIED`, `CLOSED`. Plain string. |
-| 14 | * SUBMITTED AT | `h:mm a`, server time at registration. |
-| 15 | TIME IN | Stamped at approval, not registration. |
+| 14 | * SUBMITTED AT | `h:mm a` **as text**, server time at registration. |
+| 15 | TIME IN | `h:mm a` as text. Stamped at approval, not registration. |
 | 16 | SIGNATURE (IN) | Captured at registration. `PURGED` after purge. |
-| 17 | TIME OUT | |
+| 17 | TIME OUT | `h:mm a` as text. |
 | 18 | SIGNATURE (OUT) | |
 | 19 | REMARKS | Close-out note is appended as `note (SECURITY PERSONNEL NAME)`. |
 | 20 | * APPROVED BY | Security personnel name on Approve or Deny. Replaces VERIFIED BY. |
@@ -69,8 +69,9 @@ Old rows are **not** migrated. The old tab is kept for reference.
    actions are refused until this is done.
 3. Run `rebuildSheet()` once from the editor. It renames the current
    `VISITOR LOG` tab to `VISITOR LOG (old MMdd-HHmm)` and creates a fresh
-   `VISITOR LOG` with the 19-column layout, header styling, frozen row,
-   hidden ENTRY ID, and text format on BADGE, DATE, CONTACT NO. and REF CODE.
+   `VISITOR LOG` with the 23-column layout, header styling, frozen row,
+   hidden ENTRY ID, and text format on BADGE, DATE, CONTACT NO., REF CODE,
+   SUBMITTED AT, TIME IN and TIME OUT.
 4. Deploy > Manage deployments > pencil > Version: New version > Deploy.
    Saving alone does not update the live URL.
 5. Publish the new `index.html` and `security-console.html` to GitHub Pages. The
@@ -82,9 +83,13 @@ Old rows are **not** migrated. The old tab is kept for reference.
 ## Security console PIN is now a Script Property
 
 The repo is public, so the PIN no longer lives in `Code.gs`.
-There is no `CONFIG` field for it at all, so it cannot be read from source.
-`securityAuth_` reads the Script Property `SECURITY_PIN` and returns false
-when it is missing or blank. There is no default PIN.
+`CONFIG.SECURITY_PIN` remains only as an empty signpost: nothing reads it, and
+`securityAuth_` logs a warning if a value is typed there so the cause of a
+rejected login is discoverable. `securityAuth_` reads the Script Property
+`SECURITY_PIN` and returns false when it is missing or blank. No default PIN.
+
+The quickest way to set it needs no code at all: Project Settings > Script
+Properties > Add script property, key `SECURITY_PIN`, value the PIN, Save.
 
 One-time setup, in the Apps Script editor:
 
@@ -111,14 +116,41 @@ Project Settings. No redeploy is needed; properties are read on every request.
 - `/exec` URL: committed as the `PASTE_YOUR_DEPLOYMENT_ID` placeholder. The
   real URL is a public endpoint by design and is safe to publish once pasted.
 
-`setup()` still works for a brand-new spreadsheet. `repairExistingRows()` is
-unchanged and still only touches BADGE and DATE.
+`setup()` still works for a brand-new spreadsheet. `repairExistingRows()` now
+rewrites SUBMITTED AT, TIME IN and TIME OUT as text alongside BADGE and DATE.
+
+## Times are stored as text
+
+Sheets parses `"1:44 PM"` into a time value on the 1899-12-30 epoch, which
+reads back over the API as `1899-12-30T05:44:00.000Z` and displays in the
+sheet without AM/PM. SUBMITTED AT, TIME IN and TIME OUT are therefore forced
+to text format (`@`) in `forceTextColumns_`, and re-set to `@` at every write.
+`timeStr_()` normalises on read, so rows written before this change still
+display as `h:mm a` rather than an ISO timestamp. Run `repairExistingRows()`
+to convert those cells in place.
+
+## Waiting screen updates itself
+
+This reverses the earlier "no status polling" decision, at the operator's
+request. After registering, the visitor's screen polls the new `status`
+action every 6 seconds using their reference code:
+
+- **Approved** — the screen becomes "You're in", showing the badge number
+  large, plus time in, name, department, contact person and purpose.
+- **Denied** — the screen shows the reason and directs them to the desk.
+- Polling pauses while the tab is hidden, stops after 15 minutes, and a
+  **Check now** button covers both cases.
+
+`status` takes no PIN: the reference code is the visitor's own, is only valid
+for the current day, and the reply carries only what that visitor already
+knows about their own visit.
 
 ## API actions
 
 | Action | Who | Notes |
 |---|---|---|
 | `config` | visitor | Now also returns `visitorTypes`. |
+| `status` | visitor | New. Takes `refCode`; returns today's state for that registration. No PIN. |
 | `register` | visitor | New. Replaces `checkin`. No badge field. Returns `refCode`, `name`, `submittedAt`. |
 | `lookup` | visitor | Sign-out step 1. States: `INVALID`, `NONE`, `OPEN`, `CLOSED`. `NEW` no longer exists. |
 | `checkout` | visitor | Matches only today's `APPROVED` row for the badge. Sets `CLOSED`. |

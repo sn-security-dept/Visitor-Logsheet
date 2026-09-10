@@ -119,6 +119,29 @@
   .wait-steps ol{margin:0;padding-left:20px}
   .wait-steps li{margin:4px 0}
 
+  /* Waiting / approved */
+  .waiting{display:flex;align-items:center;justify-content:center;gap:9px;
+    margin:18px 0 0;font-size:14.5px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);
+    animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.25}50%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){.dot{animation:none;opacity:.7}}
+  .badgebig{display:inline-block;margin:16px auto 6px;padding:16px 34px;
+    background:#fff;border:2px solid var(--ok);border-radius:12px;
+    font-size:52px;font-weight:700;letter-spacing:.2em;color:var(--ok);
+    font-variant-numeric:tabular-nums;line-height:1}
+  .facts{text-align:left;margin:20px auto 0;max-width:390px;background:#fff;
+    border:1.5px solid var(--line);border-radius:8px;overflow:hidden}
+  .facts div.kv{display:flex;gap:12px;padding:10px 14px;
+    border-bottom:1px solid var(--line);font-size:15px}
+  .facts div.kv:last-child{border-bottom:none}
+  .facts dt{flex:0 0 38%;color:var(--muted);margin:0}
+  .facts dd{flex:1;margin:0;font-weight:600;word-break:break-word}
+  .denybox{margin:18px auto 0;max-width:390px;padding:14px 16px;text-align:left;
+    background:#FBEAEC;border:1px solid #E4B4BB;border-radius:8px;
+    color:var(--bad);font-size:15px}
+  .denybox b{display:block;margin-bottom:4px}
+
   .consent{font-size:12.5px;color:var(--muted);line-height:1.55;
     border-top:1px solid var(--line);padding-top:16px;margin-top:24px}
   .spin{text-align:center;padding:52px 0;color:var(--muted)}
@@ -273,8 +296,43 @@
           <li>If approved, security personnel will hand you a Solaire badge.</li>
         </ol>
       </div>
-      <p class="hint">Keep the badge with you. You will need its number to sign out when you leave.</p>
-      <button class="ghost" data-back style="margin-top:20px">Done</button>
+      <div class="waiting" id="pendWait"><span class="dot"></span>
+        <span id="pendWaitText">Waiting for approval&hellip;</span></div>
+      <button class="ghost" id="btnCheckNow" style="margin-top:16px">Check now</button>
+      <button class="ghost" data-back>Cancel</button>
+    </div>
+  </div>
+
+  <!-- Approved: the screen the visitor sees the moment they are let in -->
+  <div id="step-approved" class="hide">
+    <div class="done">
+      <div class="tick">&#10003;</div>
+      <h2>You're in</h2>
+      <p class="lede" style="margin-bottom:0">Your visit has been approved.</p>
+      <div class="reflabel" style="margin-top:16px">Your Solaire badge</div>
+      <div class="badgebig" id="appBadge"></div>
+      <div class="facts">
+        <div class="kv"><dt>Name</dt><dd id="appName"></dd></div>
+        <div class="kv"><dt>Time in</dt><dd id="appTimeIn"></dd></div>
+        <div class="kv"><dt>Department</dt><dd id="appDept"></dd></div>
+        <div class="kv"><dt>Contact person</dt><dd id="appContact"></dd></div>
+        <div class="kv"><dt>Purpose</dt><dd id="appPurpose"></dd></div>
+      </div>
+      <p class="hint">Keep the badge with you. Scan again and enter this badge
+        number when you leave.</p>
+      <button class="ghost" data-back style="margin-top:16px">Done</button>
+    </div>
+  </div>
+
+  <!-- Denied -->
+  <div id="step-denied" class="hide">
+    <div class="done">
+      <div class="tick" style="background:var(--bad)">&#10005;</div>
+      <h2>Not approved</h2>
+      <div class="nm" id="denName"></div>
+      <div class="denybox"><b>Reason</b><span id="denReason"></span></div>
+      <p class="hint">Please speak to security personnel at the desk.</p>
+      <button class="ghost" data-back style="margin-top:16px">Done</button>
     </div>
   </div>
 
@@ -385,11 +443,18 @@ function Pad(canvas){
     data:function(){return dirty?canvas.toDataURL('image/png'):''},resize:size};
 }
 
-var STEPS=['step-home','step-in','step-pending','step-badge','step-out','step-done'];
+var STEPS=['step-home','step-in','step-pending','step-approved','step-denied',
+           'step-badge','step-out','step-done'];
 var FIELDS=['lastName','firstName','mi','visitorType','visitorTypeOther','company','contactNo','address',
             'idPresented','idNo','dept','contact','purpose','purposeOther','remarks'];
 var pads={}, currentBadge='';
 var wiz={ step:1, last:4, toReview:false };
+
+/* Waiting screen polls for the approval decision. Every request costs Apps
+   Script quota, so poll gently, pause while the tab is hidden, and give up
+   after POLL_MAX — the visitor can still tap "Check now". */
+var POLL_MS=6000, POLL_MAX=15*60*1000;
+var poll={ code:'', timer:null, startedAt:0, busy:false };
 var $=function(id){return document.getElementById(id)};
 var val=function(id){return String($(id).value||'').trim()};
 
@@ -411,6 +476,7 @@ function say(box,text,kind){
   el.textContent = text||'';
 }
 function reset(){
+  stopPoll();
   currentBadge=''; $('badgeInput').value='';
   FIELDS.forEach(function(f){ $(f).value=''; $(f).removeAttribute('aria-invalid'); });
   $('visitorTypeOtherField').classList.add('hide');
@@ -470,6 +536,12 @@ window.addEventListener('load',function(){
   $('badgeInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLookup(); });
   $('btnLookup').addEventListener('click',doLookup);
   $('btnCheckOut').addEventListener('click',doCheckOut);
+  $('btnCheckNow').addEventListener('click',function(){ checkStatus(true); });
+
+  // Coming back to the tab should feel instant, not wait for the next tick.
+  document.addEventListener('visibilitychange',function(){
+    if(!document.hidden && poll.timer) checkStatus(false);
+  });
 });
 
 function fill(sel, items){
@@ -603,9 +675,70 @@ function doRegister(){
     $('pendRef').textContent=res.refCode||'';
     $('pendName').textContent=res.name||'';
     show('step-pending');
+    startPoll(res.refCode||'');
   }).catch(function(){
     busy(false); $('btnNext').disabled=false;
     say('msg2','Connection problem. Tap Submit again.'); show('step-in');
+  });
+}
+
+// ── Waiting for approval ────────────────────────────────────────────────────
+function startPoll(code){
+  stopPoll();
+  if(!code) return;
+  poll.code=code; poll.startedAt=Date.now();
+  setWait('Waiting for approval…');
+  poll.timer=setInterval(tickPoll,POLL_MS);
+}
+function stopPoll(){
+  if(poll.timer){ clearInterval(poll.timer); poll.timer=null; }
+  poll.code=''; poll.busy=false;
+}
+function setWait(text){ $('pendWaitText').textContent=text; }
+
+function tickPoll(){
+  if(!poll.code || poll.busy) return;
+  if(document.hidden) return;                       // paused: save quota
+  if(Date.now()-poll.startedAt > POLL_MAX){
+    clearInterval(poll.timer); poll.timer=null;
+    setWait('Still waiting. Tap "Check now" or see security personnel.');
+    return;
+  }
+  checkStatus(false);
+}
+
+function checkStatus(manual){
+  if(!poll.code || poll.busy) return;
+  poll.busy=true;
+  if(manual) setWait('Checking…');
+  api({action:'status', refCode:poll.code}).then(function(res){
+    poll.busy=false;
+    // A "not found" reply is not fatal while waiting: the row may still be
+    // mid-write, or the day rolled over. Keep waiting rather than alarming.
+    if(!res.ok){ if(manual) setWait('Waiting for approval…'); return; }
+
+    if(res.state==='APPROVED' || res.state==='CLOSED'){
+      stopPoll();
+      $('appBadge').textContent=res.badgeNo||'—';
+      $('appName').textContent=res.name||'';
+      $('appTimeIn').textContent=res.timeIn||'—';
+      $('appDept').textContent=res.dept||'—';
+      $('appContact').textContent=res.contact||'—';
+      $('appPurpose').textContent=res.purpose||'—';
+      show('step-approved');
+
+    }else if(res.state==='DENIED'){
+      stopPoll();
+      $('denName').textContent=res.name||'';
+      $('denReason').textContent=res.deniedReason||'Please ask security personnel.';
+      show('step-denied');
+
+    }else if(manual){
+      setWait('Still pending. Please wait for security personnel.');
+    }
+  }).catch(function(){
+    poll.busy=false;
+    if(manual) setWait('Cannot reach the server. Tap "Check now" again.');
   });
 }
 
