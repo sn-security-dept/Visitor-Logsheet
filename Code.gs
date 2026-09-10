@@ -153,19 +153,22 @@ function writeHeaders_(sh) {
 }
 
 /**
- * Badge, date, ref-code and contact-number columns must be plain text. If
- * Sheets is allowed to parse them, 0010 becomes the number 10, 09-10-26
- * becomes a Date object, a ref code like 4E23 can be read as scientific
- * notation, and 09171234567 loses its leading zero — none of which match or
- * read correctly on the way out.
+ * These columns must be plain text. If Sheets is allowed to parse them, 0010
+ * becomes the number 10, 09-10-26 becomes a Date object, a ref code like 4E23
+ * is read as scientific notation, 09171234567 loses its leading zero, and
+ * "1:44 PM" becomes a time value that reads back as 1899-12-30T05:44:00Z and
+ * displays without AM/PM — none of which match or read correctly on the way out.
  */
 function forceTextColumns_(sh) {
   var rows = sh.getMaxRows() - 1;
-  sh.getRange(2, COL.BADGE, rows, 1).setNumberFormat('@');
-  sh.getRange(2, COL.DATE, rows, 1).setNumberFormat('@');
-  sh.getRange(2, COL.REF_CODE, rows, 1).setNumberFormat('@');
-  sh.getRange(2, COL.CONTACT_NO, rows, 1).setNumberFormat('@');
+  TEXT_COLS.forEach(function (c) { sh.getRange(2, c, rows, 1).setNumberFormat('@'); });
 }
+
+/** Every column that must never be re-parsed by Sheets. */
+var TEXT_COLS = [
+  COL.BADGE, COL.DATE, COL.REF_CODE, COL.CONTACT_NO,
+  COL.SUBMITTED_AT, COL.TIME_IN, COL.TIME_OUT
+];
 
 // ─── HTTP ENTRY POINTS ─────────────────────────────────────────────────────
 /**
@@ -182,6 +185,7 @@ function doPost(e) {
                                visitorTypes: VISITOR_TYPES,
                                badgeLength: CONFIG.BADGE_LENGTH }; break;
       case 'register': res = register(req); break;
+      case 'status':   res = visitStatus(req.refCode); break;
       case 'lookup':   res = lookupBadge(req.badgeNo); break;
       case 'checkout': res = checkOut(req); break;
       case 'today':    res = securityToday(req); break;
@@ -245,6 +249,9 @@ function register(d) {
     sh.getRange(r, COL.DATE).setNumberFormat('@').setValue(today_());
     sh.getRange(r, COL.REF_CODE).setNumberFormat('@').setValue(refCode);
     sh.getRange(r, COL.CONTACT_NO).setNumberFormat('@').setValue(row[COL.CONTACT_NO - 1]);
+    sh.getRange(r, COL.SUBMITTED_AT).setNumberFormat('@').setValue(row[COL.SUBMITTED_AT - 1]);
+    sh.getRange(r, COL.TIME_IN).setNumberFormat('@');
+    sh.getRange(r, COL.TIME_OUT).setNumberFormat('@');
     if (sig) sh.getRange(r, COL.SIG_IN).setFormula(link_(sig));
 
     return { ok: true, refCode: refCode, name: row[COL.NAME - 1],
@@ -277,6 +284,48 @@ function newRefCode_(sh) {
     if (!used[code]) return code;
   }
   throw new Error('Could not generate a unique reference code.');
+}
+
+// ─── STATUS (visitor waiting screen) ───────────────────────────────────────
+/**
+ * Looks up today's registration by reference code so the waiting visitor's
+ * screen can turn itself into "You're in" the moment security personnel
+ * approve. No PIN: the code is the visitor's own, it is only valid today, and
+ * the reply carries just what that visitor already knows about their visit.
+ */
+function visitStatus(raw) {
+  var code = String(raw == null ? '' : raw).trim().toUpperCase();
+  if (!/^[A-Z0-9]{2,12}$/.test(code)) return { ok: false, message: 'Invalid reference code.' };
+
+  var sh = logSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return { ok: false, message: 'Reference code not found.' };
+
+  var n = last - 1, t = today_();
+  var vals = sh.getRange(2, 1, n, LAST_COL).getValues();
+
+  for (var i = n - 1; i >= 0; i--) {           // newest first
+    var r = vals[i];
+    if (String(r[COL.REF_CODE - 1] || '').trim().toUpperCase() !== code) continue;
+    if (dateKey_(r[COL.DATE - 1]) !== t) continue;
+
+    var st = status_(r[COL.STATUS - 1]);
+    var out = {
+      ok: true, state: st || 'UNKNOWN', refCode: code,
+      name: r[COL.NAME - 1], dept: r[COL.DEPT - 1],
+      contact: r[COL.CONTACT - 1], purpose: r[COL.PURPOSE - 1],
+      submittedAt: timeStr_(r[COL.SUBMITTED_AT - 1])
+    };
+    if (st === STATUS.APPROVED || st === STATUS.CLOSED) {
+      out.badgeNo = normBadge_(r[COL.BADGE - 1]);
+      out.timeIn = timeStr_(r[COL.TIME_IN - 1]);
+      out.timeOut = timeStr_(r[COL.TIME_OUT - 1]);
+      out.approvedBy = r[COL.APPROVED_BY - 1];
+    }
+    if (st === STATUS.DENIED) out.deniedReason = r[COL.DENIED_REASON - 1];
+    return out;
+  }
+  return { ok: false, message: 'Reference code not found.' };
 }
 
 // ─── LOOKUP (sign-out step 1) ──────────────────────────────────────────────
@@ -316,7 +365,7 @@ function checkOut(d) {
     var now = new Date();
     var sh = logSheet_();
     var timeOut = fmt_(now, 'h:mm a');
-    sh.getRange(hit.row, COL.TIME_OUT).setValue(timeOut);
+    sh.getRange(hit.row, COL.TIME_OUT).setNumberFormat('@').setValue(timeOut);
     sh.getRange(hit.row, COL.SIG_OUT).setFormula(link_(saveSig_(d.signature, badgeNo, 'OUT')));
     sh.getRange(hit.row, COL.STATUS).setValue(STATUS.CLOSED);
 
@@ -401,9 +450,9 @@ function securityToday(d) {
       dept: r[COL.DEPT - 1],
       contact: r[COL.CONTACT - 1],
       purpose: r[COL.PURPOSE - 1],
-      submittedAt: r[COL.SUBMITTED_AT - 1],
-      timeIn: r[COL.TIME_IN - 1],
-      timeOut: String(r[COL.TIME_OUT - 1] || '').trim(),
+      submittedAt: timeStr_(r[COL.SUBMITTED_AT - 1]),
+      timeIn: timeStr_(r[COL.TIME_IN - 1]),
+      timeOut: timeStr_(r[COL.TIME_OUT - 1]),
       remarks: r[COL.REMARKS - 1],
       approvedBy: r[COL.APPROVED_BY - 1],
       deniedReason: r[COL.DENIED_REASON - 1]
@@ -457,7 +506,7 @@ function securityApprove(d) {
     var now = new Date();
     var timeIn = fmt_(now, 'h:mm a');
     sh.getRange(row, COL.BADGE).setNumberFormat('@').setValue(badgeNo);
-    sh.getRange(row, COL.TIME_IN).setValue(timeIn);
+    sh.getRange(row, COL.TIME_IN).setNumberFormat('@').setValue(timeIn);
     sh.getRange(row, COL.STATUS).setValue(STATUS.APPROVED);
     sh.getRange(row, COL.APPROVED_BY).setValue(securityName_(d));
 
@@ -523,14 +572,14 @@ function securityForceOut(d) {
     if (status_(r[COL.STATUS - 1]) !== STATUS.APPROVED) {
       return { ok: false, message: 'Only an approved visit can be closed out.' };
     }
-    if (String(r[COL.TIME_OUT - 1] || '').trim()) {
+    if (timeStr_(r[COL.TIME_OUT - 1])) {
       return { ok: false, message: 'Already timed out.' };
     }
 
     var now = new Date();
     var timeOut = fmt_(now, 'h:mm a');
     var note = String(d.note || '').trim().slice(0, 200) || 'Manual time out';
-    sh.getRange(row, COL.TIME_OUT).setValue(timeOut);
+    sh.getRange(row, COL.TIME_OUT).setNumberFormat('@').setValue(timeOut);
     sh.getRange(row, COL.SIG_OUT).setValue('CLOSED BY SECURITY');
     sh.getRange(row, COL.STATUS).setValue(STATUS.CLOSED);
     var prev = String(r[COL.REMARKS - 1] || '').trim();
@@ -575,6 +624,17 @@ function dateKey_(v) {
 
 function status_(v) { return String(v == null ? '' : v).trim().toUpperCase(); }
 
+/**
+ * Times are written as text ("1:44 PM"), but a cell written before
+ * forceTextColumns_ covered these columns comes back as a Date on the Sheets
+ * epoch (1899-12-30). Normalise both to "h:mm a" so the console and the
+ * visitor screen never show an ISO timestamp.
+ */
+function timeStr_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, CONFIG.TZ, 'h:mm a');
+  return String(v == null ? '' : v).trim();
+}
+
 /** Row numbers from the client are only ever used after the row is re-read and re-checked. */
 function rowArg_(v) {
   var n = Number(v);
@@ -606,7 +666,7 @@ function findOpenOrLast_(badgeNo) {
     if (dateKey_(dates[i][0]) !== t) continue;
     var st = status_(stats[i][0]);
     var row = i + 2;
-    if (st === STATUS.APPROVED && !String(outs[i][0] || '').trim()) return readRow_(sh, row);  // open visit wins
+    if (st === STATUS.APPROVED && !timeStr_(outs[i][0])) return readRow_(sh, row);  // open visit wins
     if ((st === STATUS.CLOSED || st === STATUS.APPROVED) && !lastClosed) lastClosed = row;
   }
   return lastClosed ? readRow_(sh, lastClosed) : null;
@@ -624,7 +684,7 @@ function openHolder_(sh, badgeNo, skipRow) {
     if (normBadge_(r[COL.BADGE - 1]) !== badgeNo) continue;
     if (dateKey_(r[COL.DATE - 1]) !== t) continue;
     if (status_(r[COL.STATUS - 1]) !== STATUS.APPROVED) continue;
-    if (String(r[COL.TIME_OUT - 1] || '').trim()) continue;
+    if (timeStr_(r[COL.TIME_OUT - 1])) continue;
     return String(r[COL.NAME - 1] || 'another visitor');
   }
   return '';
@@ -639,8 +699,8 @@ function readRow_(sh, row) {
     dept: r[COL.DEPT - 1],
     contact: r[COL.CONTACT - 1],
     purpose: r[COL.PURPOSE - 1],
-    timeIn: r[COL.TIME_IN - 1],
-    timeOut: String(r[COL.TIME_OUT - 1] || '').trim()
+    timeIn: timeStr_(r[COL.TIME_IN - 1]),
+    timeOut: timeStr_(r[COL.TIME_OUT - 1])
   };
 }
 
@@ -764,6 +824,13 @@ function repairExistingRows() {
   var dRng = sh.getRange(2, COL.DATE, n, 1);
   dRng.setNumberFormat('@')
       .setValues(dRng.getValues().map(function (r) { return [dateKey_(r[0])]; }));
+
+  // Times Sheets parsed into 1899-epoch values: rewrite as "h:mm a" text.
+  [COL.SUBMITTED_AT, COL.TIME_IN, COL.TIME_OUT].forEach(function (c) {
+    var rng = sh.getRange(2, c, n, 1);
+    rng.setNumberFormat('@')
+       .setValues(rng.getValues().map(function (r) { return [timeStr_(r[0])]; }));
+  });
 }
 
 /**
