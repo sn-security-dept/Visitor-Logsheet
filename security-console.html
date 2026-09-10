@@ -11,11 +11,14 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);
     font-family:"Helvetica Neue",Arial,sans-serif;font-size:15px}
-  header{background:var(--brand);color:#fff;padding:16px 22px;
+  header{background:var(--brand);color:#fff;padding:16px;
     display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
   header h1{margin:0;font-size:18px;font-weight:600}
   header .date{font-size:14px;opacity:.9}
-  .wrap{max-width:1280px;margin:0 auto;padding:20px 22px 60px}
+  /* Near full width: the Pending tab carries 12 columns and the officer needs
+     to read them all without scrolling sideways. The PIN gate re-centres
+     itself below via its own max-width. */
+  .wrap{max-width:none;margin:0;padding:18px 16px 60px}
 
   .gate{max-width:340px;margin:60px auto;text-align:center}
   .gate h2{font-size:19px;font-weight:600;margin:0 0 6px}
@@ -34,8 +37,8 @@
   .tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
   .tabs button.warnTab{border-color:#E3CFA0;color:#8A5A00;background:#FDF4E3}
   .tabs button.warnTab.on{background:#8A5A00;color:#fff;border-color:#8A5A00}
-  #search{flex:1;min-width:180px;padding:9px 12px;font-size:14.5px;font-family:inherit;
-    border:1.5px solid var(--line);border-radius:7px;background:#fff}
+  #search{flex:1;min-width:180px;max-width:460px;padding:9px 12px;font-size:14.5px;
+    font-family:inherit;border:1.5px solid var(--line);border-radius:7px;background:#fff}
   #search:focus{outline:none;border-color:var(--brand)}
   .count{color:var(--muted);font-size:14px;white-space:nowrap}
   .err{background:#FBEAEC;border:1px solid #E4B4BB;color:var(--bad);
@@ -45,18 +48,20 @@
 
   .tablebox{background:#fff;border:1.5px solid var(--line);border-radius:8px;overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:14px}
-  th{background:var(--brand-tint);text-align:left;padding:11px 12px;font-weight:600;
+  th{background:var(--brand-tint);text-align:left;padding:10px;font-weight:600;
     white-space:nowrap;border-bottom:1.5px solid var(--line);cursor:pointer;user-select:none}
   th.nosort{cursor:default}
   th .car{color:var(--muted);font-size:11px;margin-left:3px}
-  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
   tr:last-child td{border-bottom:none}
   tr.out td{color:var(--muted)}
   .badge{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
   .ref{font-weight:700;letter-spacing:.12em;font-variant-numeric:tabular-nums;white-space:nowrap;
     color:var(--brand-dk)}
   .nm{font-weight:600}
-  .addr{max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .addr{max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* Long free text may wrap rather than push the table wider. */
+  td:not(.badge):not(.ref):not(.time):not(.acts){overflow-wrap:anywhere}
   .time{font-variant-numeric:tabular-nums;white-space:nowrap}
   .raw{font-family:Menlo,Consolas,monospace;font-size:13px;background:#FDF4E3;padding:2px 6px;border-radius:4px}
   .acts{white-space:nowrap}
