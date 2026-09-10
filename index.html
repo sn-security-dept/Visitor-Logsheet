@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#DF6A2E">
+<title>Visitor Log — SN Security Department</title>
+<style>
+  :root{
+    --brand:#DF6A2E; --brand-dk:#B94F1A; --brand-tint:#FDF0E7;
+    --ink:#1A1512; --paper:#FCFAF8; --line:#E2D9D1; --muted:#726860;
+    --ok:#1F6B45; --warn:#8A5A00;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:"Helvetica Neue",Arial,sans-serif;font-size:17px;line-height:1.45}
+  .wrap{max-width:520px;margin:0 auto;padding:0 20px 52px}
+
+  header{background:var(--brand);color:#fff;padding:22px 20px 20px;margin-bottom:26px}
+  header .org{font-size:12.5px;letter-spacing:.14em;opacity:.9;margin:0 0 4px}
+  header h1{margin:0;font-size:21px;font-weight:600;letter-spacing:-.01em}
+  header .sub{margin:3px 0 0;font-size:14px;opacity:.85}
+
+  h2{font-size:20px;margin:0 0 6px;font-weight:600;letter-spacing:-.01em}
+  .lede{color:var(--muted);font-size:15px;margin:0 0 22px}
+
+  label{display:block;font-size:14.5px;font-weight:600;margin:0 0 6px}
+  .req{color:var(--brand-dk);font-weight:400}
+  input,select{width:100%;padding:13px 14px;font-size:17px;font-family:inherit;
+    border:1.5px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--brand);
+    box-shadow:0 0 0 3px rgba(223,106,46,.18)}
+  .field{margin-bottom:17px}
+  .row{display:flex;gap:11px}
+  .row .field{flex:1}
+  .row .field.mi{flex:0 0 82px}
+  #passInput{font-size:30px;letter-spacing:.18em;text-align:center;font-weight:600;padding:16px}
+
+  button{width:100%;padding:16px;font-size:17px;font-weight:600;font-family:inherit;
+    border:none;border-radius:7px;background:var(--brand);color:#fff;cursor:pointer}
+  button:active{background:var(--brand-dk)}
+  button:disabled{opacity:.5}
+  button.ghost{background:none;color:var(--brand-dk);border:1.5px solid var(--line);margin-top:10px}
+  button:focus-visible{outline:3px solid var(--brand-dk);outline-offset:2px}
+
+  .sigbox{border:1.5px solid var(--line);border-radius:7px;background:#fff;overflow:hidden}
+  canvas{display:block;width:100%;height:170px;touch-action:none}
+  .sigfoot{display:flex;justify-content:space-between;align-items:center;
+    padding:8px 12px;border-top:1px solid var(--line);font-size:13.5px;color:var(--muted)}
+  .sigfoot button{width:auto;padding:4px 10px;background:none;color:var(--brand-dk);font-size:13.5px}
+
+  .card{background:var(--brand-tint);border:1.5px solid var(--line);
+    border-left:5px solid var(--brand);padding:18px 20px;margin-bottom:22px}
+  .card .nm{font-size:20px;font-weight:600;margin:0 0 3px}
+  .card .meta{font-size:14.5px;color:var(--muted);margin:0}
+  .card .tin{margin-top:11px;padding-top:11px;border-top:1px solid var(--line);font-size:15px}
+  .card .tin b{font-variant-numeric:tabular-nums}
+
+  .msg{padding:13px 15px;border-radius:7px;font-size:15px;margin-bottom:20px;display:none}
+  .msg.err{background:#FBEAEC;border:1px solid #E4B4BB;color:#8C1220;display:block}
+  .msg.warn{background:#FDF4E3;border:1px solid #E3CFA0;color:var(--warn);display:block}
+
+  .done{text-align:center;padding:46px 10px}
+  .done .tick{width:64px;height:64px;border-radius:50%;background:var(--ok);color:#fff;
+    font-size:34px;line-height:64px;margin:0 auto 20px}
+  .done h2{font-size:23px}
+  .done .stamp{font-size:38px;font-weight:600;font-variant-numeric:tabular-nums;
+    margin:14px 0 4px;color:var(--brand-dk)}
+  .done .nm{font-size:17px;font-weight:600}
+  .done .hint{color:var(--muted);font-size:14.5px;margin-top:22px}
+
+  .consent{font-size:12.5px;color:var(--muted);line-height:1.55;
+    border-top:1px solid var(--line);padding-top:16px;margin-top:24px}
+  .spin{text-align:center;padding:52px 0;color:var(--muted)}
+  .hide{display:none}
+</style>
+</head>
+<body>
+
+<header>
+  <p class="org">SN SECURITY DEPARTMENT</p>
+  <h1>Visitors Logsheet</h1>
+  <p class="sub">Staff Entrance</p>
+</header>
+
+<div class="wrap">
+
+  <div id="step-pass">
+    <h2>Enter your pass number</h2>
+    <p class="lede">The number on the temporary pass the guard gave you.</p>
+    <div id="msg1" class="msg"></div>
+    <div class="field">
+      <input id="passInput" type="text" inputmode="numeric" autocomplete="off"
+             placeholder="0000" maxlength="6" aria-label="Temporary pass number">
+    </div>
+    <button id="btnLookup">Continue</button>
+  </div>
+
+  <div id="step-in" class="hide">
+    <h2>Sign in</h2>
+    <p class="lede">Pass <b id="inPass"></b></p>
+    <div id="msg2" class="msg"></div>
+
+    <div class="field"><label>Last name <span class="req">*</span></label>
+      <input id="lastName" autocomplete="family-name" autocapitalize="words"></div>
+    <div class="row">
+      <div class="field"><label>First name <span class="req">*</span></label>
+        <input id="firstName" autocomplete="given-name" autocapitalize="words"></div>
+      <div class="field mi"><label>M.I.</label><input id="mi" maxlength="2"></div>
+    </div>
+    <div class="field"><label>ID presented <span class="req">*</span></label>
+      <select id="idPresented"><option value="">Select ID</option></select></div>
+    <div class="field"><label>ID number <span class="req">*</span></label>
+      <input id="idNo" autocomplete="off" autocapitalize="characters" spellcheck="false"
+             placeholder="As shown on your ID"></div>
+    <div class="field"><label>Department visiting <span class="req">*</span></label>
+      <input id="dept" placeholder="e.g. HR" autocapitalize="characters"></div>
+    <div class="field"><label>Contact person <span class="req">*</span></label>
+      <input id="contact" placeholder="e.g. Ms. Sophia Mabaet" autocapitalize="words"></div>
+    <div class="field"><label>Remarks</label><input id="remarks" placeholder="Optional"></div>
+
+    <div class="field">
+      <label>Signature <span class="req">*</span></label>
+      <div class="sigbox">
+        <canvas id="sigIn"></canvas>
+        <div class="sigfoot"><span>Sign with your finger</span>
+          <button type="button" data-clear="sigIn">Clear</button></div>
+      </div>
+    </div>
+
+    <p class="consent">By signing, you authorise the Company to obtain, collect, use, process,
+      share and retain your personal information for security and identification purposes as
+      indicated in the Privacy Policy, and to retain adequate documentation of said information
+      for five (5) years from the date of processing.</p>
+
+    <button id="btnCheckIn" style="margin-top:18px">Submit and record time in</button>
+    <button class="ghost" data-back>Back</button>
+  </div>
+
+  <div id="step-out" class="hide">
+    <h2>Sign out</h2>
+    <p class="lede">Check your details, then sign.</p>
+    <div id="msg3" class="msg"></div>
+    <div class="card">
+      <p class="nm" id="outName"></p>
+      <p class="meta" id="outMeta"></p>
+      <p class="tin">Time in <b id="outTimeIn"></b></p>
+    </div>
+    <div class="field">
+      <label>Signature <span class="req">*</span></label>
+      <div class="sigbox">
+        <canvas id="sigOut"></canvas>
+        <div class="sigfoot"><span>Sign with your finger</span>
+          <button type="button" data-clear="sigOut">Clear</button></div>
+      </div>
+    </div>
+    <button id="btnCheckOut">Confirm time out</button>
+    <button class="ghost" data-back>Back</button>
+  </div>
+
+  <div id="step-done" class="hide">
+    <div class="done">
+      <div class="tick">&#10003;</div>
+      <h2 id="doneTitle"></h2>
+      <div class="stamp" id="doneTime"></div>
+      <div class="nm" id="doneName"></div>
+      <p class="hint" id="doneHint"></p>
+      <button class="ghost" data-back style="margin-top:20px">Done</button>
+    </div>
+  </div>
+
+  <div id="spin" class="spin hide">Saving&hellip;</div>
+</div>
+
+<script>
+// ══ PASTE YOUR APPS SCRIPT /exec URL HERE ══════════════════════════════════
+var API_URL = 'https://script.google.com/macros/s/PASTE_YOUR_DEPLOYMENT_ID/exec';
+var PASS_LENGTH = 4;
+
+/**
+ * Body is sent as a plain string, so the browser treats this as a simple
+ * request and skips the CORS preflight. Apps Script cannot answer a preflight,
+ * so never set a Content-Type header here.
+ */
+function api(payload){
+  return fetch(API_URL, { method:'POST', body: JSON.stringify(payload) })
+    .then(function(r){ return r.json(); });
+}
+
+/** Same rule as the server: digits only, padded. 12 and 0012 are one pass. */
+function normPass(v){
+  var d = String(v||'').replace(/\D/g,'');
+  if(!d) return '';
+  d = d.slice(-PASS_LENGTH);
+  while(d.length < PASS_LENGTH) d = '0' + d;
+  return d;
+}
+
+function Pad(canvas){
+  var ctx=canvas.getContext('2d'), drawing=false, dirty=false, last=null;
+  function size(){
+    var r=canvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    var prev = dirty ? canvas.toDataURL() : null;
+    canvas.width=r.width*dpr; canvas.height=r.height*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.lineCap='round'; ctx.lineJoin='round';
+    ctx.strokeStyle='#1A1512'; ctx.lineWidth=2.1;
+    if(prev){var i=new Image();i.onload=function(){ctx.drawImage(i,0,0,r.width,r.height)};i.src=prev}
+  }
+  function pt(e){var r=canvas.getBoundingClientRect(),t=e.touches?e.touches[0]:e;
+    return {x:t.clientX-r.left,y:t.clientY-r.top}}
+  function start(e){e.preventDefault();drawing=true;dirty=true;last=pt(e)}
+  function move(e){if(!drawing)return;e.preventDefault();var p=pt(e);
+    ctx.beginPath();ctx.moveTo(last.x,last.y);
+    ctx.quadraticCurveTo(last.x,last.y,(last.x+p.x)/2,(last.y+p.y)/2);ctx.stroke();last=p}
+  function end(){drawing=false}
+  canvas.addEventListener('mousedown',start);canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('mousemove',move);canvas.addEventListener('touchmove',move,{passive:false});
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(function(ev){canvas.addEventListener(ev,end)});
+  window.addEventListener('resize',size); size();
+  return {clear:function(){ctx.clearRect(0,0,canvas.width,canvas.height);dirty=false},
+    isEmpty:function(){return !dirty},
+    data:function(){return dirty?canvas.toDataURL('image/png'):''},resize:size};
+}
+
+var pads={}, currentPass='';
+var $=function(id){return document.getElementById(id)};
+
+function show(id){
+  ['step-pass','step-in','step-out','step-done'].forEach(function(s){
+    $(s).classList.toggle('hide', s!==id);
+  });
+  $('spin').classList.add('hide');
+  window.scrollTo(0,0);
+  if(id==='step-in') pads.sigIn.resize();
+  if(id==='step-out') pads.sigOut.resize();
+}
+function busy(on){
+  $('spin').classList.toggle('hide',!on);
+  ['step-pass','step-in','step-out'].forEach(function(s){
+    if(!$(s).classList.contains('hide')) $(s).style.display = on?'none':'';
+  });
+}
+function say(box,text,kind){
+  var el=$(box);
+  el.className = text ? 'msg '+(kind||'err') : 'msg';
+  el.textContent = text||'';
+}
+function reset(){
+  currentPass=''; $('passInput').value='';
+  ['lastName','firstName','mi','idNo','dept','contact','remarks'].forEach(function(f){$(f).value=''});
+  $('idPresented').value='';
+  pads.sigIn.clear(); pads.sigOut.clear();
+  say('msg1','');say('msg2','');say('msg3','');
+  show('step-pass');
+}
+
+window.addEventListener('load',function(){
+  pads.sigIn=Pad($('sigIn'));
+  pads.sigOut=Pad($('sigOut'));
+
+  document.querySelectorAll('[data-clear]').forEach(function(b){
+    b.addEventListener('click',function(){pads[b.dataset.clear].clear()});
+  });
+  document.querySelectorAll('[data-back]').forEach(function(b){
+    b.addEventListener('click',reset);
+  });
+
+  api({action:'config'}).then(function(res){
+    if(!res.ok) return;
+    PASS_LENGTH = res.passLength || 4;
+    var sel=$('idPresented');
+    res.idTypes.forEach(function(t){
+      var o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o);
+    });
+  }).catch(function(){
+    say('msg1','Cannot reach the server. Check your connection.');
+  });
+
+  $('passInput').addEventListener('keydown',function(e){ if(e.key==='Enter') doLookup(); });
+  $('btnLookup').addEventListener('click',doLookup);
+  $('btnCheckIn').addEventListener('click',doCheckIn);
+  $('btnCheckOut').addEventListener('click',doCheckOut);
+  $('passInput').focus();
+});
+
+function doLookup(){
+  var typed=$('passInput').value;
+  var p=normPass(typed);
+  if(!p){ say('msg1','Enter your pass number.'); return; }
+  $('passInput').value = p;
+  say('msg1','');
+  busy(true);
+
+  api({action:'lookup', passNo:p}).then(function(res){
+    busy(false);
+    currentPass = res.passNo || p;
+
+    if(res.state==='INVALID'){ say('msg1',res.message); show('step-pass'); return; }
+
+    if(res.state==='NEW'){
+      $('inPass').textContent=currentPass;
+      show('step-in');
+
+    }else if(res.state==='OPEN'){
+      $('outName').textContent=res.name;
+      $('outMeta').textContent=[res.dept,res.contact].filter(Boolean).join(' \u00B7 ');
+      $('outTimeIn').textContent=res.timeIn;
+      show('step-out');
+
+    }else if(res.state==='CLOSED'){
+      say('msg1','Pass '+res.passNo+' ('+res.name+') was already timed out at '+
+          res.timeOut+'. Please see the guard.','warn');
+      show('step-pass');
+    }
+  }).catch(function(){
+    busy(false); say('msg1','Connection problem. Tap Continue again.');
+  });
+}
+
+function doCheckIn(){
+  if(pads.sigIn.isEmpty()){ say('msg2','Please sign before submitting.'); return; }
+  say('msg2','');
+  busy(true);
+  api({
+    action:'checkin', passNo:currentPass,
+    lastName:$('lastName').value, firstName:$('firstName').value, mi:$('mi').value,
+    idPresented:$('idPresented').value, idNo:$('idNo').value,
+    dept:$('dept').value, contact:$('contact').value, remarks:$('remarks').value,
+    signature:pads.sigIn.data()
+  }).then(function(res){
+    busy(false);
+    if(!res.ok){ say('msg2',res.message); show('step-in'); return; }
+    $('doneTitle').textContent='Signed in';
+    $('doneTime').textContent=res.timeIn;
+    $('doneName').textContent=res.name;
+    $('doneHint').textContent='Keep pass '+res.passNo+
+      ' with you. Scan again and enter the same number when you leave.';
+    show('step-done');
+  }).catch(function(){
+    busy(false); say('msg2','Connection problem. Tap Submit again.');
+  });
+}
+
+function doCheckOut(){
+  if(pads.sigOut.isEmpty()){ say('msg3','Please sign before confirming.'); return; }
+  say('msg3','');
+  busy(true);
+  api({action:'checkout', passNo:currentPass, signature:pads.sigOut.data()})
+  .then(function(res){
+    busy(false);
+    if(!res.ok){ say('msg3',res.message); show('step-out'); return; }
+    $('doneTitle').textContent='Signed out';
+    $('doneTime').textContent=res.timeOut;
+    $('doneName').textContent=res.name;
+    $('doneHint').textContent='Please return pass '+res.passNo+' to the guard. Thank you.';
+    show('step-done');
+  }).catch(function(){
+    busy(false); say('msg3','Connection problem. Tap Confirm again.');
+  });
+}
+</script>
+</body>
+</html>
