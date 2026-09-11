@@ -41,6 +41,39 @@
     font-family:inherit;border:1.5px solid var(--line);border-radius:7px;background:#fff}
   #search:focus{outline:none;border-color:var(--brand)}
   .count{color:var(--muted);font-size:14px;white-space:nowrap}
+
+  /* Date filter + export controls */
+  .datepick{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--muted);white-space:nowrap}
+  .datepick input{padding:8px 10px;font-size:14.5px;font-family:inherit;color:var(--ink);
+    border:1.5px solid var(--line);border-radius:7px;background:#fff}
+  .datepick input:focus{outline:none;border-color:var(--brand)}
+  .tbtn{padding:9px 14px;border:1.5px solid var(--line);background:#fff;border-radius:7px;
+    font-size:14.5px;font-weight:600;font-family:inherit;cursor:pointer;color:var(--ink);white-space:nowrap}
+  .tbtn.pri{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .tbtn:disabled{opacity:.5;cursor:default}
+  .sp{flex:1}
+
+  /* Export modal */
+  .modal{position:fixed;inset:0;background:rgba(26,21,18,.45);display:flex;
+    align-items:center;justify-content:center;padding:20px;z-index:50}
+  .mbox{background:#fff;border-radius:10px;width:100%;max-width:460px;padding:22px 24px 20px;
+    box-shadow:0 18px 50px rgba(0,0,0,.25)}
+  .mbox h3{margin:0 0 14px;font-size:18px;font-weight:600}
+  .kinds{border:none;margin:0 0 16px;padding:0}
+  .kinds legend{font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;padding:0}
+  .kinds label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;margin-bottom:6px;
+    border:1.5px solid var(--line);border-radius:8px;cursor:pointer}
+  .kinds label:has(input:checked){border-color:var(--brand);background:var(--brand-tint)}
+  .kinds input{margin-top:3px}
+  .kinds b{display:block;font-size:14.5px}
+  .kinds small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+  .range{display:flex;gap:12px;margin-bottom:14px}
+  .range label{flex:1;font-size:13px;font-weight:600;color:var(--muted)}
+  .range input{display:block;width:100%;margin-top:4px;padding:9px 10px;font-size:14.5px;
+    font-family:inherit;color:var(--ink);border:1.5px solid var(--line);border-radius:7px}
+  .range input:focus{outline:none;border-color:var(--brand)}
+  .mact{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .mnote{font-size:13px;color:var(--muted);margin:0 0 12px}
   .err{background:#FBEAEC;border:1px solid #E4B4BB;color:var(--bad);
     padding:12px 14px;border-radius:7px;font-size:14.5px;margin-bottom:16px}
   .notice{background:#FDF4E3;border:1px solid #E3CFA0;color:#8A5A00;
@@ -102,6 +135,14 @@
   <div id="console" class="hide">
     <div id="err" class="err hide"></div>
     <div id="unkNote" class="notice hide"></div>
+    <div id="pastNote" class="notice hide"></div>
+    <div class="bar">
+      <label class="datepick"><span>Date</span>
+        <input id="dateInput" type="date" aria-label="Show records for this date"></label>
+      <button id="btnToday" class="tbtn" type="button">Today</button>
+      <span class="sp"></span>
+      <button id="btnExport" class="tbtn pri" type="button">Export CSV</button>
+    </div>
     <div class="bar">
       <div class="tabs" id="tabs">
         <button data-tab="pending" class="on">Pending</button>
@@ -122,12 +163,47 @@
   </div>
 </div>
 
+<!-- Export modal -->
+<div id="modal" class="modal hide" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="mbox">
+    <h3 id="mTitle">Export to CSV</h3>
+    <fieldset class="kinds">
+      <legend>What to export</legend>
+      <label><input type="radio" name="kind" value="register" checked>
+        <span><b>Registrations</b><small>Everyone who registered in the range, whatever the outcome
+        (pending, approved, denied, closed).</small></span></label>
+      <label><input type="radio" name="kind" value="exit">
+        <span><b>Sign-outs</b><small>Only visits with a time out, with how they were closed
+        (visitor signature or closed by security).</small></span></label>
+      <label><input type="radio" name="kind" value="all">
+        <span><b>Full log</b><small>Every row and every sheet column, including signature links
+        and reference codes.</small></span></label>
+    </fieldset>
+    <div class="range">
+      <label>From <input id="expFrom" type="date"></label>
+      <label>To <input id="expTo" type="date"></label>
+    </div>
+    <p class="mnote">Opens in Excel or Google Sheets. Badge numbers keep their leading zeros
+      if you import the file as text.</p>
+    <div id="mErr" class="err hide"></div>
+    <div class="mact">
+      <button id="btnExpCancel" class="tbtn" type="button">Cancel</button>
+      <button id="btnExpGo" class="tbtn pri" type="button">Export</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══ PASTE YOUR APPS SCRIPT /exec URL HERE ══════════════════════════════════
 var API_URL = 'https://script.google.com/macros/s/AKfycbyJ3Gch9Mn-sCgt8kfNB0aItP_AGnnLjvNYxs_JgIonSxP63UAcQmqTU_9JibkGCN7z/exec';
 
 var PIN='', PERSONNEL='', tab='pending', timer=null;
 var data={pending:[],inside:[],done:[],denied:[],unknown:[]};
+
+/* Which day the console is showing. '' = today (server decides what today is,
+   in Asia/Manila). isToday gates Approve/Deny, which the server only allows
+   on today's registrations anyway. */
+var viewDate='', isToday=true, todayIso='';
 var $=function(i){return document.getElementById(i)};
 
 /* One open inline action at a time: {row, kind:'approve'|'deny', value, err} */
@@ -253,13 +329,24 @@ function gateErr(m){ var e=$('gateErr'); e.textContent=m; e.classList.remove('hi
 function showErr(m){ var e=$('err'); e.textContent=m||''; e.classList.toggle('hide',!m); }
 
 function load(){
-  api({action:'today'}).then(function(r){ if(r.ok) apply(r); else showErr(r.message); })
+  api({action:'today', date:viewDate}).then(function(r){ if(r.ok) apply(r); else showErr(r.message); })
     .catch(function(){});
 }
 function apply(res){
   data={pending:res.pending||[],inside:res.inside||[],done:res.done||[],
         denied:res.denied||[],unknown:res.unknown||[]};
-  $('today').textContent=res.today||'';
+  isToday = res.isToday !== false;
+  todayIso = keyToIso(res.today||'');
+  var shown = res.date || res.today || '';
+  $('today').textContent = shown + (isToday ? '' : '  (not today)');
+  if(!$('dateInput').value) $('dateInput').value = keyToIso(shown);
+  var pn=$('pastNote');
+  if(isToday){ pn.classList.add('hide'); }
+  else {
+    pn.textContent='Showing '+shown+'. Approve and Deny only apply to today’s registrations; '+
+      'Close out still works for anyone left inside.';
+    pn.classList.remove('hide');
+  }
   showErr('');
   // If the row someone was acting on has left the pending list, drop the inline form.
   if(open && !data.pending.some(function(v){return v.row===open.row})) open=null;
@@ -387,6 +474,7 @@ function actions(v){
     return '<button data-force="'+v.row+'">Close out</button>';
   }
   if(tab!=='pending') return '';
+  if(!isToday) return '<span class="dash">—</span>';   // server would refuse anyway
   if(open && open.row===v.row){
     var err = open.err ? '<span class="ferr">'+esc(open.err)+'</span>' : '';
     if(open.kind==='approve'){
@@ -467,6 +555,72 @@ function submitDeny(){
     if(!r.ok){ if(open){ open.busy=false; open.err=r.message||'Could not deny.'; } render(); load(); return; }
     open=null; load();
   }).catch(function(){ if(open){ open.busy=false; open.err='Cannot reach the server.'; } render(); });
+}
+
+// ── Date filter ─────────────────────────────────────────────────────────────
+/** "MM-dd-yy" (sheet key) -> "yyyy-MM-dd" (what <input type="date"> wants). */
+function keyToIso(k){
+  var m=String(k||'').match(/^(\d{2})-(\d{2})-(\d{2})$/);
+  return m ? '20'+m[3]+'-'+m[1]+'-'+m[2] : '';
+}
+$('dateInput').addEventListener('change',function(){
+  viewDate=this.value||''; open=null; load();
+});
+$('btnToday').addEventListener('click',function(){
+  viewDate=''; $('dateInput').value=''; open=null; load();
+});
+
+// ── Export ──────────────────────────────────────────────────────────────────
+var lastFocus=null;
+function openModal(){
+  lastFocus=document.activeElement;
+  var d=$('dateInput').value||todayIso;
+  $('expFrom').value=d; $('expTo').value=d;
+  $('mErr').classList.add('hide');
+  $('btnExpGo').disabled=false; $('btnExpGo').textContent='Export';
+  $('modal').classList.remove('hide');
+  document.querySelector('input[name="kind"]:checked').focus();
+}
+function closeModal(){
+  $('modal').classList.add('hide');
+  if(lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function mErr(m){ var e=$('mErr'); e.textContent=m||''; e.classList.toggle('hide',!m); }
+
+$('btnExport').addEventListener('click',openModal);
+$('btnExpCancel').addEventListener('click',closeModal);
+$('modal').addEventListener('click',function(e){ if(e.target===this) closeModal(); });
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape' && !$('modal').classList.contains('hide')) closeModal();
+});
+
+$('btnExpGo').addEventListener('click',function(){
+  var kind=(document.querySelector('input[name="kind"]:checked')||{}).value;
+  var from=$('expFrom').value, to=$('expTo').value;
+  if(!from||!to){ mErr('Choose a "from" and "to" date.'); return; }
+  if(from>to){ mErr('"From" must be on or before "To".'); return; }
+  mErr('');
+  var b=$('btnExpGo'); b.disabled=true; b.textContent='Preparing…';
+  api({action:'export', kind:kind, from:from, to:to}).then(function(r){
+    b.disabled=false; b.textContent='Export';
+    if(!r.ok){ mErr(r.message||'Export failed.'); return; }
+    if(!r.rows){ mErr('No '+(r.kind||'').toLowerCase()+' between those dates.'); return; }
+    download(r.csv, r.filename);
+    closeModal();
+  }).catch(function(){
+    b.disabled=false; b.textContent='Export';
+    mErr('Cannot reach the server. Try again.');
+  });
+});
+
+/** Hand the CSV text to the browser as a file. The BOM is already in the text. */
+function download(text, name){
+  var blob=new Blob([text],{type:'text/csv;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download=name||'export.csv'; a.style.display='none';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
 }
 
 /** Same rule as the server: digits only, padded to 4. */

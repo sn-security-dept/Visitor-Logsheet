@@ -129,6 +129,45 @@ to text format (`@`) in `forceTextColumns_`, and re-set to `@` at every write.
 display as `h:mm a` rather than an ISO timestamp. Run `repairExistingRows()`
 to convert those cells in place.
 
+## Date filter in the console
+
+A calendar picker in the toolbar shows any day's records across all five
+tabs. A **Today** button returns to the live view. On a past day the header
+reads "(not today)", a notice explains the limits, and Approve / Deny are
+hidden because the server only accepts them for today's registrations. Close
+out still works, so a visit left open on a previous day can be tidied up.
+
+The 20-second refresh keeps polling whichever day is shown. Dates travel as
+`yyyy-MM-dd` and are converted to the sheet's `MM-dd-yy` key with string
+operations only, so no timezone arithmetic can shift the day.
+
+## CSV export
+
+**Export CSV** in the toolbar opens a modal asking what to export and for
+which date range. The range defaults to the day being viewed.
+
+| Kind | Rows | Columns |
+|---|---|---|
+| Registrations | Every registration in the range, any status | Date, ref code, submitted at, name, type, company, contact no., address, ID, ID no., department, contact person, purpose, status, badge, time in, approved by, denied reason, remarks |
+| Sign-outs | Only rows with a time out | Date, badge, name, type, company, department, contact person, purpose, time in, time out, **signed out via** (visitor signature / closed by security), approved by, remarks |
+| Full log | Every row | All 23 sheet columns in sheet order; signature cells export the Drive URL rather than the word "Signature" |
+
+Details and limits:
+
+- The CSV is built server-side under the PIN, so the console never needs
+  more than one day loaded. Rows come out in sheet order.
+- Range is capped at 366 days per export. "From" must not be after "To".
+- Text starts with a UTF-8 BOM so Excel shows accented names correctly.
+- **Formula-injection guard.** A visitor could type `=HYPERLINK(...)` as their
+  company, and Excel would run it on open. Any cell starting with `=` or `@`,
+  or with a `+`/`-` that is not a plain number, is prefixed with an apostrophe.
+  Phone numbers such as `+639170000000` pass through unchanged.
+- Excel's double-click CSV opener strips leading zeros, so `0010` shows as
+  `10`. Import via Data > From Text/CSV with the badge column set to Text, or
+  open in Google Sheets and set the column to plain text. The data in the
+  file is correct either way.
+- An empty range says so instead of downloading a header-only file.
+
 ## Waiting screen updates itself
 
 This reverses the earlier "no status polling" decision, at the operator's
@@ -154,7 +193,8 @@ knows about their own visit.
 | `register` | visitor | New. Replaces `checkin`. No badge field. Returns `refCode`, `name`, `submittedAt`. |
 | `lookup` | visitor | Sign-out step 1. States: `INVALID`, `NONE`, `OPEN`, `CLOSED`. `NEW` no longer exists. |
 | `checkout` | visitor | Matches only today's `APPROVED` row for the badge. Sets `CLOSED`. |
-| `today` | security | Returns `pending` (oldest first), `inside`, `done`, `denied`, `unknown` (newest first). |
+| `today` | security | Returns `pending` (oldest first), `inside`, `done`, `denied`, `unknown` (newest first). Optional `date` (`yyyy-MM-dd`) shows another day; reply carries `date` and `isToday`. |
+| `export` | security | New. `kind` = `register` / `exit` / `all`, `from` and `to` as `yyyy-MM-dd`. Returns CSV text, filename and row count. |
 | `approve` | security | New. Needs `row` and `badgeNo`. |
 | `deny` | security | New. Needs `row` and non-empty `reason`. Ignores any badge in the request. |
 | `force` | security | Close out. Now refuses rows that are not `APPROVED`. Sets `CLOSED`. |

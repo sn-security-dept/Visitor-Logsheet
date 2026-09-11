@@ -189,6 +189,7 @@ function doPost(e) {
       case 'lookup':   res = lookupBadge(req.badgeNo); break;
       case 'checkout': res = checkOut(req); break;
       case 'today':    res = securityToday(req); break;
+      case 'export':   res = securityExport(req); break;
       case 'approve':  res = securityApprove(req); break;
       case 'deny':     res = securityDeny(req); break;
       case 'force':    res = securityForceOut(req); break;
@@ -413,19 +414,29 @@ function securityName_(d) {
 }
 
 /**
- * Today's rows split by status. pending is oldest-first (it is a queue);
- * inside, done and denied are newest-first. Any row whose STATUS is not one
- * of the four known values lands in unknown[] with its raw status, so a
- * hand-edited or future-state row is surfaced, never hidden.
+ * One day's rows split by status. Defaults to today; pass date as
+ * "yyyy-MM-dd" (what <input type="date"> produces) to view another day.
+ * pending is oldest-first (it is a queue); inside, done and denied are
+ * newest-first. Any row whose STATUS is not one of the four known values
+ * lands in unknown[] with its raw status, so a hand-edited or future-state
+ * row is surfaced, never hidden.
  */
 function securityToday(d) {
   if (!securityAuth_(d)) return { ok: false, message: 'Wrong PIN.' };
 
+  var t = today_();
+  var key = t;
+  if (d.date != null && String(d.date).trim() !== '') {
+    key = isoToKey_(d.date);
+    if (!key) return { ok: false, message: 'Invalid date.' };
+  }
+  var isToday = key === t;
+
   var sh = logSheet_();
   var last = sh.getLastRow();
-  var t = today_();
   if (last < 2) {
-    return { ok: true, pending: [], inside: [], done: [], denied: [], unknown: [], today: t };
+    return { ok: true, pending: [], inside: [], done: [], denied: [], unknown: [],
+             today: t, date: key, isToday: isToday };
   }
 
   var vals = sh.getRange(2, 1, last - 1, LAST_COL).getValues();
@@ -433,7 +444,7 @@ function securityToday(d) {
 
   for (var i = 0; i < vals.length; i++) {
     var r = vals[i];
-    if (dateKey_(r[COL.DATE - 1]) !== t) continue;
+    if (dateKey_(r[COL.DATE - 1]) !== key) continue;
     var item = {
       row: i + 2,
       status: status_(r[COL.STATUS - 1]),
@@ -466,7 +477,133 @@ function securityToday(d) {
     }
   }
   return { ok: true, pending: pending, inside: inside.reverse(), done: done.reverse(),
-           denied: denied.reverse(), unknown: unknown.reverse(), today: t };
+           denied: denied.reverse(), unknown: unknown.reverse(),
+           today: t, date: key, isToday: isToday };
+}
+
+// ─── CSV EXPORT ────────────────────────────────────────────────────────────
+/**
+ * What each export kind includes. Column entries are COL indices (header
+ * taken from HEADERS) or a string key for a derived column. `all` is null,
+ * meaning every sheet column in sheet order.
+ */
+var EXPORT_KINDS = {
+  register: {
+    label: 'Registrations',
+    cols: [COL.DATE, COL.REF_CODE, COL.SUBMITTED_AT, COL.NAME, COL.VISITOR_TYPE,
+           COL.COMPANY, COL.CONTACT_NO, COL.ADDRESS, COL.ID_PRESENTED, COL.ID_NO,
+           COL.DEPT, COL.CONTACT, COL.PURPOSE, COL.STATUS, COL.BADGE, COL.TIME_IN,
+           COL.APPROVED_BY, COL.DENIED_REASON, COL.REMARKS]
+  },
+  exit: {
+    label: 'Sign-outs',
+    cols: [COL.DATE, COL.BADGE, COL.NAME, COL.VISITOR_TYPE, COL.COMPANY, COL.DEPT,
+           COL.CONTACT, COL.PURPOSE, COL.TIME_IN, COL.TIME_OUT, 'SIGNED_OUT_VIA',
+           COL.APPROVED_BY, COL.REMARKS]
+  },
+  all: { label: 'Full log', cols: null }
+};
+var EXPORT_MAX_DAYS = 366;
+
+/**
+ * Builds a CSV for a date range. kind: register | exit | all. from/to are
+ * "yyyy-MM-dd". Returns the CSV as text (with a UTF-8 BOM so Excel reads
+ * accented names correctly) for the console to hand to the browser as a
+ * download. Rows come out in sheet order, which is chronological.
+ */
+function securityExport(d) {
+  if (!securityAuth_(d)) return { ok: false, message: 'Wrong PIN.' };
+
+  var kind = String(d.kind || '').trim().toLowerCase();
+  var spec = EXPORT_KINDS[kind];
+  if (!spec) return { ok: false, message: 'Choose what to export.' };
+
+  var from = String(d.from || '').trim(), to = String(d.to || '').trim();
+  var fromKey = isoToKey_(from), toKey = isoToKey_(to);
+  if (!fromKey || !toKey) return { ok: false, message: 'Choose a valid "from" and "to" date.' };
+  var fromS = sortableDate_(fromKey), toS = sortableDate_(toKey);
+  if (fromS > toS) return { ok: false, message: '"From" must be on or before "To".' };
+  if (daysBetween_(from, to) > EXPORT_MAX_DAYS) {
+    return { ok: false, message: 'Range too long. Export at most one year at a time.' };
+  }
+
+  var header = spec.cols
+    ? spec.cols.map(function (c) { return typeof c === 'number' ? HEADERS[c - 1] : c.replace(/_/g, ' '); })
+    : HEADERS.slice();
+
+  var rows = [];
+  var sh = logSheet_();
+  var last = sh.getLastRow();
+  if (last >= 2) {
+    var n = last - 1;
+    var rng = sh.getRange(2, 1, n, LAST_COL);
+    var vals = rng.getValues();
+    var forms = rng.getFormulas();      // signature cells hold =HYPERLINK(...); export the URL
+
+    for (var i = 0; i < n; i++) {
+      var r = vals[i];
+      var k = sortableDate_(dateKey_(r[COL.DATE - 1]));
+      if (!k || k < fromS || k > toS) continue;
+      if (kind === 'exit' && !timeStr_(r[COL.TIME_OUT - 1])) continue;
+
+      var line = spec.cols
+        ? spec.cols.map(function (c) { return exportCell_(r, forms[i], c); })
+        : HEADERS.map(function (_, j) { return exportCell_(r, forms[i], j + 1); });
+      rows.push(line);
+    }
+  }
+
+  var csv = '\uFEFF' + [csvLine_(header)].concat(rows.map(csvLine_)).join('\r\n') + '\r\n';
+  var fname = 'visitor-log_' + kind + '_' + from + (from === to ? '' : '_to_' + to) + '.csv';
+  return { ok: true, csv: csv, filename: fname, rows: rows.length, kind: spec.label };
+}
+
+/** One export cell. c is a COL index or a derived-column key. */
+function exportCell_(r, forms, c) {
+  if (c === 'SIGNED_OUT_VIA') {
+    if (/HYPERLINK/i.test(String(forms[COL.SIG_OUT - 1] || ''))) return 'Visitor signature';
+    return String(r[COL.SIG_OUT - 1] == null ? '' : r[COL.SIG_OUT - 1]).trim();
+  }
+  if (c === COL.SIG_IN || c === COL.SIG_OUT) {
+    var m = String(forms[c - 1] || '').match(/HYPERLINK\("([^"]+)"/i);
+    if (m) return m[1];
+  }
+  var v = r[c - 1];
+  if (c === COL.DATE) return dateKey_(v);
+  if (c === COL.BADGE) return normBadge_(v);
+  if (c === COL.SUBMITTED_AT || c === COL.TIME_IN || c === COL.TIME_OUT) return timeStr_(v);
+  return v == null ? '' : String(v);
+}
+
+/**
+ * RFC 4180 quoting, plus a guard against spreadsheet formula injection: a
+ * visitor could type "=HYPERLINK(...)" as their company name, and Excel would
+ * run it when the officer opens the export. Cells that start with = or @, or
+ * with a +/- that is not simply a number, get a leading apostrophe. Plain
+ * phone numbers like +639170000000 pass through untouched.
+ */
+function csvCell_(v) {
+  var s = v == null ? '' : String(v);
+  if (/^[=@\t\r]/.test(s) || (/^[+-]/.test(s) && !/^[+-][\d\s().-]*$/.test(s))) s = "'" + s;
+  if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function csvLine_(arr) { return arr.map(csvCell_).join(','); }
+
+/** "yyyy-MM-dd" (from <input type="date">) -> "MM-dd-yy" (the sheet's DATE key). Pure string work, no timezone drift. */
+function isoToKey_(iso) {
+  var m = String(iso == null ? '' : iso).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  var mo = Number(m[2]), da = Number(m[3]);
+  if (mo < 1 || mo > 12 || da < 1 || da > 31) return '';
+  return m[2] + '-' + m[3] + '-' + m[1].slice(2);
+}
+
+/** Whole days from ISO date a to ISO date b, computed in UTC so DST cannot skew it. */
+function daysBetween_(a, b) {
+  var pa = String(a).split('-'), pb = String(b).split('-');
+  var da = Date.UTC(+pa[0], +pa[1] - 1, +pa[2]), db = Date.UTC(+pb[0], +pb[1] - 1, +pb[2]);
+  return Math.round((db - da) / 86400000);
 }
 
 /**
